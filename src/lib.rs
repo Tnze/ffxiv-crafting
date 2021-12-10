@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
-/// Skills 是代表了一个玩家在作业时可以使用的一个技能的枚举。
+/// 代表一个玩家在作业时可以使用的一个技能的枚举。
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
@@ -262,7 +262,7 @@ impl Display for UnknownSkillErr {
 
 impl Error for UnknownSkillErr {}
 
-/// Condition 代表了当前的“制作状态”，也就是俗称的球色。
+/// 代表了当前的“制作状态”，也就是俗称的球色。
 #[derive(Copy, Clone, Debug)]
 pub enum Condition {
     // 白：通常
@@ -339,15 +339,20 @@ impl Condition {
     }
 }
 
+/// 玩家装备属性
 #[derive(Copy, Clone)]
 pub struct Attributes {
+    /// 玩家等级
     pub level: i32,
+    /// 制作精度
     pub craftsmanship: i32,
+    /// 加工精度
     pub control: i32,
+    /// 制作力
     pub craft_points: i32,
 }
 
-/// Recipe 储存了一次制作中配方的信息。
+/// 储存了一次制作中配方的信息。
 #[derive(Copy, Clone)]
 pub struct Recipe {
     /// 配方品级
@@ -947,16 +952,29 @@ impl Recipe {
 /// Buffs 储存了一次制作中玩家全部buff状态信息
 #[derive(Copy, Clone, Default)]
 pub struct Buffs {
+    /// 元素之美名
     pub name_of_the_elements: Option<DurationBuff>,
+    /// 坚信
     pub muscle_memory: Option<DurationBuff>,
+    /// 阔步
     pub great_strides: Option<DurationBuff>,
+    /// 崇敬
     pub veneration: Option<DurationBuff>,
+    /// 改革
     pub innovation: Option<DurationBuff>,
+    /// 内静
     pub inner_quiet: Option<LayerBuff>,
+    /// 最终确认
     pub final_appraisal: Option<DurationBuff>,
+    /// 掌握
     pub manipulation: Option<DurationBuff>,
+    /// 俭约 OR 长期俭约
     pub wast_not: Option<DurationBuff>,
+    /// 中级加工预备
+    /// 假想buff，用于处理 加工-中级加工 的连击。
     pub standard_touch_prepared: Option<DurationBuff>,
+    /// 观察（注视预备）
+    /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
     pub observed: Option<DurationBuff>,
 }
 
