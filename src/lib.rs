@@ -1,3 +1,5 @@
+pub mod export;
+
 #[cfg(feature = "serde-support")]
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -1169,10 +1171,9 @@ impl Status {
     pub fn calc_synthesis(&self, efficiency: f32) -> i32 {
         let factor = self.level_diff_factor();
         let craftsmanship = self.attributes.craftsmanship;
-        let standard_progress = factor.0
-            * (0.21 * craftsmanship as f32 + 2.0)
-            * (10000 + craftsmanship) as f32
-            / (10000 + self.recipe.craftsmanship) as f32;
+        let standard_progress =
+            factor.0 * (0.21 * craftsmanship as f32 + 2.0) * (10000 + craftsmanship) as f32
+                / (10000 + self.recipe.craftsmanship) as f32;
         (standard_progress.floor() * self.condition.synth_ratio() * efficiency) as i32
     }
 
@@ -1609,7 +1610,7 @@ impl Status {
 /// use ffxiv_crafting::{Condition, ConditionIterator};
 /// // 该配方的cond_flag为15，玩家等级为80。
 /// for (c, p) in ConditionIterator::new(15, 80) {
-///     println!("出现 {} 的概率为: {}", c, p);
+///     println!("出现 {:?} 的概率为: {}", c, p);
 /// }
 /// ```
 ///
