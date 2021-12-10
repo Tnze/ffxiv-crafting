@@ -934,7 +934,7 @@ impl Recipe {
             520 => Some((2620, 2540)),
             _ => None,
         }
-            .unwrap();
+        .unwrap();
 
         Recipe {
             rlv,
@@ -1143,7 +1143,7 @@ impl Status {
         c
     }
 
-    fn consume_durability(&mut self, durability: i32) {
+    fn calc_durability(&self, durability: i32) -> i32 {
         let mut reduce = durability;
         if let Condition::Sturdy = self.condition {
             reduce -= reduce / 2;
@@ -1151,7 +1151,11 @@ impl Status {
         if self.buffs.wast_not.is_some() {
             reduce -= reduce / 2;
         }
-        self.durability -= reduce;
+        reduce
+    }
+
+    fn consume_durability(&mut self, durability: i32) {
+        self.durability -= self.calc_durability(durability);
     }
 
     fn consume_craft_point(&mut self, cp: i32) {
@@ -1232,7 +1236,8 @@ impl Status {
             Skills::CarefulSynthesis => self.cast_synthesis(7, 10, 1.5),
             Skills::FocusedSynthesis => self.cast_synthesis(5, 10, 2.0),
             Skills::Groundwork => {
-                let e = if self.durability < 20 { 1.5 } else { 3.0 };
+                let d = self.calc_durability(20);
+                let e = if self.durability < d { 1.5 } else { 3.0 };
                 self.cast_synthesis(18, 20, e)
             }
             Skills::IntensiveSynthesis => self.cast_synthesis(6, 10, 4.0),
@@ -1391,18 +1396,18 @@ impl Status {
         };
         addon
             + match action {
-            Skills::HastyTouch => 0.6,
-            Skills::RapidSynthesis => 0.5,
-            Skills::PatientTouch => 0.5,
-            Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                if self.buffs.observed.is_some() {
-                    1.0
-                } else {
-                    0.5
+                Skills::HastyTouch => 0.6,
+                Skills::RapidSynthesis => 0.5,
+                Skills::PatientTouch => 0.5,
+                Skills::FocusedSynthesis | Skills::FocusedTouch => {
+                    if self.buffs.observed.is_some() {
+                        1.0
+                    } else {
+                        0.5
+                    }
                 }
+                _ => return 1.0,
             }
-            _ => return 1.0,
-        }
     }
 
     /// 当前状态是否允许发动某技能。
@@ -1425,10 +1430,10 @@ impl Status {
         match action {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent) =>
-                {
-                    Err(RequireGoodOrExcellent)
-                }
+                if !matches!(self.condition, Condition::Good | Condition::Excellent) =>
+            {
+                Err(RequireGoodOrExcellent)
+            }
             Skills::PrudentTouch if self.buffs.wast_not.is_some() => Err(NotAllowedInWastNotBuff),
             Skills::MuscleMemory | Skills::Reflect | Skills::TrainedEye if self.step != 0 => {
                 Err(OnlyAllowedInFirstStep)
@@ -1726,7 +1731,7 @@ mod tests {
             (Skills::StandardTouch, 30, 83, 3671, 2425),
             (Skills::ByregotsBlessing, 20, 59, 3671, 4188),
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step.0);
             assert_eq!(s.durability, step.1);
@@ -1762,7 +1767,7 @@ mod tests {
             (Skills::ByregotsBlessing, 20, 201, 1017, 3312),
             (Skills::StandardTouch, 10, 169, 1017, 4015),
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step.0);
             assert_eq!(s.durability, step.1);
@@ -1780,7 +1785,7 @@ mod tests {
             (Skills::MuscleMemory, 50, 351, 1017, 0),
             (Skills::Groundwork, 30, 333, 3051, 0),
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step.0);
             assert_eq!(s.durability, step.1);
@@ -1800,7 +1805,7 @@ mod tests {
             (Skills::MastersMend, 60, 157, 0, 375),
             (Skills::MastersMend, 60, 69, 0, 375),
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step.0);
             assert_eq!(s.durability, step.1);
@@ -1826,7 +1831,7 @@ mod tests {
             (Skills::PreparatoryTouch, 10, 76, 2034, 4326),
             (Skills::DelicateSynthesis, 0, 44, 2373, 5496),
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step.0);
             assert_eq!(s.durability, step.1);
@@ -1856,7 +1861,7 @@ mod tests {
             Skills::Groundwork,
             Skills::CarefulSynthesis,
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step);
         }
@@ -1881,7 +1886,7 @@ mod tests {
             Skills::PrudentTouch,
             Skills::BasicTouch,
         ]
-            .iter()
+        .iter()
         {
             s.cast_action(step);
         }
@@ -1918,7 +1923,7 @@ mod tests {
             (Skills::RapidSynthesis, true, 9006, 634, Condition::Normal),
             (Skills::RapidSynthesis, true, 11376, 634, Condition::Normal),
         ]
-            .iter()
+        .iter()
         {
             if step.1 {
                 s.cast_action(step.0);
@@ -1990,8 +1995,8 @@ mod tests {
             (Skills::PreparatoryTouch, true, 12460, Condition::Good),
             (Skills::PreciseTouch, true, 19840, Condition::Centered),
         ]
-            .iter()
-            .enumerate()
+        .iter()
+        .enumerate()
         {
             if *success {
                 s.cast_action(*skill);
