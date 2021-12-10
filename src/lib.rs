@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
+/// Skills 是代表了一个玩家在作业时可以使用的一个技能的枚举。
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
@@ -126,6 +127,8 @@ impl Skills {
             Skills::CarefulObservation => 55,
         }
     }
+
+    /// 将Skills转换为对应技能中文名字的字符串。
     pub fn as_chinese(&self) -> &str {
         match self {
             Skills::BasicSynthesis => "制作",
@@ -259,6 +262,7 @@ impl Display for UnknownSkillErr {
 
 impl Error for UnknownSkillErr {}
 
+/// Condition 代表了当前的“制作状态”，也就是俗称的球色。
 #[derive(Copy, Clone, Debug)]
 pub enum Condition {
     // 白：通常
@@ -343,15 +347,53 @@ pub struct Attributes {
     pub craft_points: i32,
 }
 
+/// Recipe 储存了一次制作中配方的信息。
 #[derive(Copy, Clone)]
 pub struct Recipe {
+    /// 配方品级
     pub rlv: i32,
+
+    /// 制作配方所需的玩家等级
     pub level: i32,
+
+    /// 制作精度
     pub craftsmanship: i32,
+
+    /// 加工精度
     pub control: i32,
+
+    /// 难度（最大进展）
     pub progress: i32,
+
+    /// 最高品质
     pub quality: i32,
+
+    /// 耐久
     pub durability: i32,
+
+    /// 制作状态标志位，用于表示本次制作有可能出现哪些球色。
+    /// 该字段从低到高每个bit依次表示对应Condition中的状态是否会出现
+    ///
+    /// Example:
+    /// ```rust
+    /// use ffxiv_crafting::Condition;
+    ///
+    /// fn belong(cond_flag: i32, cond: Condition) -> bool {
+    ///     cond_flag & (1 << cond as usize) != 0
+    /// }
+    ///
+    /// let cond_flag = 15; // 15即0b00001111，表示只有可能出现白球、红球、彩球和黑球
+    /// assert_eq!(belong(cond_flag, Condition::Normal), true);
+    /// assert_eq!(belong(cond_flag, Condition::Good), true);
+    /// assert_eq!(belong(cond_flag, Condition::Excellent), true);
+    /// assert_eq!(belong(cond_flag, Condition::Poor), true);
+    ///
+    /// assert_eq!(belong(cond_flag, Condition::Centered), false);
+    /// assert_eq!(belong(cond_flag, Condition::Sturdy), false);
+    /// assert_eq!(belong(cond_flag, Condition::Pliant), false);
+    /// assert_eq!(belong(cond_flag, Condition::Malleable), false);
+    /// assert_eq!(belong(cond_flag, Condition::Primed), false);
+    /// ```
     pub cond_flag: i32,
 }
 
@@ -902,6 +944,7 @@ impl Recipe {
     }
 }
 
+/// Buffs 储存了一次制作中玩家全部buff状态信息
 #[derive(Copy, Clone, Default)]
 pub struct Buffs {
     pub name_of_the_elements: Option<DurationBuff>,
@@ -917,9 +960,11 @@ pub struct Buffs {
     pub observed: Option<DurationBuff>,
 }
 
+/// LayerBuff 代表拥有层数的buff，且层数不会随着制作回合衰减，唯一的例子就是内静。
 #[derive(Copy, Clone, Debug)]
 pub struct LayerBuff(pub usize);
 
+/// DurationBuff 代表拥有剩余时长的buff，该时长会随着制作回合而递减，例如改革、崇敬等等。
 #[derive(Copy, Clone, Debug)]
 pub struct DurationBuff(pub usize);
 
@@ -989,31 +1034,51 @@ impl Buffs {
     }
 }
 
+/// Status 储存一次制作模拟所需的全部状态信息
 #[derive(Copy, Clone)]
 pub struct Status {
+    /// 玩家当前身上的buff
     pub buffs: Buffs,
+    /// 玩家的装备属性
     pub attributes: Attributes,
+    /// 本次制作配方
     pub recipe: Recipe,
 
+    /// 剩余耐久
     pub durability: i32,
+    /// 剩余制作力
     pub craft_points: i32,
+    /// 进展
     pub progress: i32,
+    /// 品质
     pub quality: i32,
 
+    /// 步数
     pub step: i32,
+    /// 制作状态
     pub condition: Condition,
 }
 
+/// 技能释放错误
 #[derive(Debug)]
 pub enum CastActionError {
+    /// 耐久不足
     DurabilityNotEnough,
+    /// 制作力不足
     CraftPointNotEnough,
+    /// 制作已完成无法发动技能
     CraftingAlreadyFinished,
+    /// 该技能尚未学会，玩家等级不足
     PlayerLevelTooLow,
+    /// 该技能只有在“高品质”及以上的状态下才能使用
     RequireGoodOrExcellent,
+    /// 该技能在俭约及长期简约状态下无法使用
     NotAllowedInWastNotBuff,
+    /// 该技能仅可在首次作业时发动
     OnlyAllowedInFirstStep,
+    /// 该技能仅可在首次作业且用于等级低了10级及以上的配方时发动
     LevelGapMustGreaterThanTen,
+    /// 内静状态下无法使用内静
     InnerQuietWhenAlreadyExist,
 }
 
@@ -1128,6 +1193,7 @@ impl Status {
         Some(DurationBuff(dt + a))
     }
 
+    /// 发动一次技能。
     pub fn cast_action(&mut self, action: Skills) {
         match action {
             Skills::BasicSynthesis => {
@@ -1269,6 +1335,7 @@ impl Status {
         self.step += 1;
     }
 
+    /// 发动一次技能，并且失败。
     pub fn fail_action(&mut self, action: Skills) {
         match action {
             Skills::HastyTouch => self.consume_durability(10),
@@ -1298,6 +1365,7 @@ impl Status {
         self.step += 1;
     }
 
+    /// 计算当前状态下某技能的成功概率，返回结果介于[0_f32..=1_f32]之间。
     pub fn success_rate(&self, action: Skills) -> f32 {
         let addon = match self.condition {
             Condition::Centered => 0.25,
@@ -1319,6 +1387,7 @@ impl Status {
         }
     }
 
+    /// 当前状态是否允许发动某技能。
     pub fn is_action_allowed(&self, action: Skills) -> Result<(), CastActionError> {
         use CastActionError::{
             CraftPointNotEnough, CraftingAlreadyFinished, DurabilityNotEnough,
@@ -1359,10 +1428,15 @@ impl Status {
         }
     }
 
+    /// 本次制作是否已经结束。
     pub fn is_finished(&self) -> bool {
         self.progress >= self.recipe.progress || self.durability <= 0
     }
 
+    /// 计算当前状态的HQ概率。
+    /// 返回一个百分数，即：
+    /// 如果返回89，则代表概率为89%。
+    ///
     /// Calculate the HQ probability of current status.
     /// The return value is a percentage, that is,
     /// if 89 is returned, it means that the probability is 89%.
@@ -1504,6 +1578,18 @@ impl Status {
     }
 }
 
+/// 用于根据cond_flag和玩家等级计算各个球色出现概率的迭代器
+///
+/// Examples:
+///
+/// ```rust
+/// use ffxiv_crafting::{Condition, ConditionIterator};
+/// // 该配方的cond_flag为15，玩家等级为80。
+/// for (c, p) in ConditionIterator::new(15, 80) {
+///     println!("出现 {} 的概率为: {}", c, p);
+/// }
+/// ```
+///
 pub struct ConditionIterator {
     flag: i32,
     rate: f32,
@@ -1932,7 +2018,7 @@ mod tests {
             s.cast_action(Skills::PreparatoryTouch);
             s.cast_action(Skills::ByregotsBlessing);
             s.cast_action(Skills::Groundwork);
-            if let Some(100) = s.high_quality_probability(){
+            if let Some(100) = s.high_quality_probability() {
                 println!("Minimum control: {}", control);
                 break;
             }
