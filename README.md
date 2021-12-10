@@ -1,3 +1,3 @@
 # ffxiv-crafting
 
-An crafting simulator of FFXIV
+A crafting simulator of FFXIV.
