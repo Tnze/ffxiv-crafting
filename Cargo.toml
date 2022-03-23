@@ -2,7 +2,7 @@
 name = "ffxiv-crafting"
 version = "6.0.0"
 edition = "2021"
-authors = ["Tnze"]
+authors = ["Tnze <cjd001113@outlook.com>"]
 description = "A crafting simulator of FFXIV."
 readme = "README.md"
 repository = "https://github.com/Tnze/ffxiv-crafting"

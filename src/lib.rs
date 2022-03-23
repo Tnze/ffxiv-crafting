@@ -1,9 +1,12 @@
+#![feature(mixed_integer_ops)]
+
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
 #[cfg(feature = "serde-support")]
 use serde::{Deserialize, Serialize};
+use crate::CastActionError::RequireInnerQuiet;
 
 mod data;
 pub mod export;
@@ -510,6 +513,8 @@ pub enum CastActionError {
     OnlyAllowedInFirstStep,
     /// 该技能仅可在首次作业且用于等级低了10级及以上的配方时发动
     LevelGapMustGreaterThanTen,
+    /// 该技能只有在内静的档数大于1时才可以使用
+    RequireInnerQuiet
 }
 
 impl Display for CastActionError {
@@ -523,6 +528,7 @@ impl Display for CastActionError {
             CastActionError::NotAllowedInWastNotBuff => "not allowed in wast not buff",
             CastActionError::OnlyAllowedInFirstStep => "only allowed in first step",
             CastActionError::LevelGapMustGreaterThanTen => "level gap must greater than 10",
+            CastActionError::RequireInnerQuiet => "require at least 1 stack of inner quiet",
         })
     }
 }
@@ -599,12 +605,13 @@ impl Status {
         }
     }
 
-    fn cast_touch(&mut self, cp: i32, durability: i32, efficiency: f32, inner_quiet_addon: u8) {
+    fn cast_touch(&mut self, cp: i32, durability: i32, efficiency: f32, inner_quiet_addon: i8) {
         let e = self.buffs.touch(efficiency);
-        self.quality += self.calc_touch(e);
+        let quality_addon = self.calc_touch(e);
+        self.quality = (self.quality + quality_addon).min(self.recipe.quality);
         self.consume_durability(durability);
         self.consume_craft_point(cp);
-        self.buffs.inner_quiet = (self.buffs.inner_quiet + inner_quiet_addon).min(10);
+        self.buffs.inner_quiet = (self.buffs.inner_quiet.saturating_add_signed(inner_quiet_addon)).min(10);
     }
 
     pub fn new_duration_buff(&self, dt: usize) -> Option<DurationBuff> {
@@ -655,8 +662,7 @@ impl Status {
             }
             Skills::ByregotsBlessing => {
                 let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).max(3.0);
-                self.cast_touch(24, 10, e, 1);
-                self.buffs.inner_quiet = 0;
+                self.cast_touch(24, 10, e, -(self.buffs.inner_quiet as i8));
             }
             Skills::PreciseTouch => self.cast_touch(18, 10, 1.5, 2),
             Skills::PrudentTouch => self.cast_touch(25, 5, 1.0, 1),
@@ -798,18 +804,22 @@ impl Status {
 
         match action {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
+
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent) =>
-                {
-                    Err(RequireGoodOrExcellent)
-                }
+            if !matches!(self.condition, Condition::Good | Condition::Excellent) => Err(RequireGoodOrExcellent),
+
             Skills::PrudentTouch if self.buffs.wast_not.is_some() => Err(NotAllowedInWastNotBuff),
+
             Skills::MuscleMemory | Skills::Reflect | Skills::TrainedEye if self.step != 0 => {
                 Err(OnlyAllowedInFirstStep)
             }
+
             Skills::TrainedEye if self.attributes.level - self.recipe.job_level < 10 => {
                 Err(LevelGapMustGreaterThanTen)
             }
+
+            Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet),
+
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
             _ if cp > self.craft_points => Err(CraftPointNotEnough),
             _ if self.progress >= self.recipe.difficulty => Err(CraftingAlreadyFinished),
@@ -1028,6 +1038,7 @@ mod tests {
             s.cast_action(step.a);
             assert_eq!(s.progress, step.pg, "step [{}] progress simulation fail: want {}, get {}", i, step.pg, s.progress);
             assert_eq!(s.quality, step.qu, "step [{}] quality simulation fail: want {}, get {}", i, step.qu, s.quality);
+            assert_eq!(s.durability, step.du, "step [{}] durability simulation fail: want {}, get {}", i, step.du, s.durability);
             s.condition = map_cond(step.co);
         }
     }
@@ -1046,39 +1057,41 @@ mod tests {
         struct Step {
             a: i32,
             pg: u16,
-            ppg: i32,
             qu: i32,
             du: i32,
             co: u8,
         }
         for (i, step) in [
-            Step { a: 100390, pg: 0, ppg: 0, qu: 288, du: 70, co: 2 },
-            Step { a: 100131, pg: 0, ppg: 0, qu: 1065, du: 60, co: 1 },
-            Step { a: 4577, pg: 0, ppg: 0, qu: 1065, du: 60, co: 1 },
-            Step { a: 100230, pg: 0, ppg: 0, qu: 1468, du: 60, co: 3 },
-            Step { a: 100302, pg: 0, ppg: 0, qu: 4924, du: 45, co: 4 },
-            Step { a: 100082, pg: 0, ppg: 0, qu: 4924, du: 50, co: 1 },
-            Step { a: 100246, pg: 0, ppg: 0, qu: 5658, du: 45, co: 1 },
-            Step { a: 100342, pg: 0, ppg: 0, qu: 6700, du: 40, co: 1 },
-            Step { a: 19300, pg: 0, ppg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 100075, pg: 403, ppg: 403, qu: 6700, du: 40, co: 1 },
-            Step { a: 100075, pg: 806, ppg: 403, qu: 6700, du: 35, co: 1 },
-            Step { a: 100075, pg: 1209, ppg: 403, qu: 6700, du: 25, co: 1 },
-            Step { a: 100075, pg: 1612, ppg: 403, qu: 6700, du: 15, co: 1 },
-            Step { a: 100077, pg: 1612, ppg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 19300, pg: 1612, ppg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 100082, pg: 1612, ppg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 100246, pg: 1612, ppg: 0, qu: 6700, du: 35, co: 1 },
-            Step { a: 100082, pg: 1612, ppg: 0, qu: 6700, du: 35, co: 1 },
-            Step { a: 100238, pg: 2284, ppg: 672, qu: 6700, du: 25, co: 1 },
-            Step { a: 100082, pg: 2284, ppg: 0, qu: 6700, du: 25, co: 1 },
-            Step { a: 100238, pg: 2732, ppg: 448, qu: 6700, du: 15, co: 1 },
-            Step { a: 100082, pg: 2732, ppg: 0, qu: 6700, du: 15, co: 1 },
-            Step { a: 100238, pg: 3000, ppg: 448, qu: 6700, du: 5, co: 1 },
+            Step { a: 100390, pg: 0, qu: 288, du: 70, co: 2 },
+            Step { a: 100131, pg: 0, qu: 1065, du: 60, co: 1 },
+            Step { a: 4577, pg: 0, qu: 1065, du: 60, co: 1 },
+            Step { a: 100230, pg: 0, qu: 1468, du: 60, co: 3 },
+            Step { a: 100302, pg: 0, qu: 4924, du: 45, co: 4 },
+            Step { a: 100082, pg: 0, qu: 4924, du: 50, co: 1 },
+            Step { a: 100246, pg: 0, qu: 5658, du: 45, co: 1 },
+            Step { a: 100342, pg: 0, qu: 6700, du: 40, co: 1 },
+            Step { a: 19300, pg: 0, qu: 6700, du: 45, co: 1 },
+            Step { a: 100075, pg: 403,  qu: 6700, du: 40, co: 1 },
+            Step { a: 100075, pg: 806,  qu: 6700, du: 35, co: 1 },
+            Step { a: 100075, pg: 1209,  qu: 6700, du: 25, co: 1 },
+            Step { a: 100075, pg: 1612,  qu: 6700, du: 15, co: 1 },
+            Step { a: 100077, pg: 1612, qu: 6700, du: 45, co: 1 },
+            Step { a: 19300, pg: 1612, qu: 6700, du: 45, co: 1 },
+            Step { a: 100082, pg: 1612, qu: 6700, du: 45, co: 1 },
+            Step { a: 100246, pg: 1612, qu: 6700, du: 35, co: 1 },
+            Step { a: 100082, pg: 1612, qu: 6700, du: 35, co: 1 },
+            Step { a: 100238, pg: 2284, qu: 6700, du: 25, co: 1 },
+            Step { a: 100082, pg: 2284, qu: 6700, du: 25, co: 1 },
+            Step { a: 100238, pg: 2732,  qu: 6700, du: 15, co: 1 },
+            Step { a: 100082, pg: 2732, qu: 6700, du: 15, co: 1 },
+            Step { a: 100238, pg: 3000,  qu: 6700, du: 5, co: 1 },
         ].iter().enumerate() {
-            s.cast_action(data::action_table(step.a).unwrap());
-            assert_eq!(s.progress, step.pg, "step [{}] progress simulation fail: want {}, get {}", i, step.pg, s.progress);
-            assert_eq!(s.quality, step.qu, "step [{}] quality simulation fail: want {}, get {}", i, step.qu, s.quality);
+            let skill = data::action_table(step.a).unwrap();
+            println!("casting: {:?}", skill);
+            s.cast_action(skill);
+            assert_eq!(s.progress, step.pg, "step [{:?}] progress simulation fail: want {}, get {}", skill, step.pg, s.progress);
+            assert_eq!(s.quality, step.qu, "step [{:?}] quality simulation fail: want {}, get {}", skill, step.qu, s.quality);
+            assert_eq!(s.durability, step.du, "step [{:?}] durability simulation fail: want {}, get {}", skill, step.du, s.durability);
             s.condition = map_cond(step.co);
         }
     }
