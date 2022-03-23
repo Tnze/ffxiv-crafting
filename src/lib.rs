@@ -7,8 +7,6 @@ use std::fmt::{Debug, Display, Formatter};
 #[cfg(feature = "serde-support")]
 use serde::{Deserialize, Serialize};
 
-use crate::CastActionError::RequireInnerQuiet;
-
 mod data;
 pub mod export;
 
@@ -53,43 +51,6 @@ pub enum Skills {
 }
 
 impl Skills {
-    fn craft_point(&self) -> i32 {
-        match self {
-            Skills::BasicSynthesis => 0,
-            Skills::BasicTouch => 18,
-            Skills::MastersMend => 88,
-            Skills::HastyTouch => 0,
-            Skills::RapidSynthesis => 0,
-            Skills::Observe => 7,
-            Skills::TricksOfTheTrade => 0,
-            Skills::WasteNot => 56,
-            Skills::Veneration => 18,
-            Skills::StandardTouch => 32,
-            Skills::GreatStrides => 32,
-            Skills::Innovation => 18,
-            Skills::FinalAppraisal => 1,
-            Skills::WasteNotII => 98,
-            Skills::ByregotsBlessing => 24,
-            Skills::PreciseTouch => 18,
-            Skills::MuscleMemory => 6,
-            Skills::CarefulSynthesis => 7,
-            Skills::Manipulation => 96,
-            Skills::PrudentTouch => 25,
-            Skills::FocusedSynthesis => 5,
-            Skills::FocusedTouch => 18,
-            Skills::Reflect => 6,
-            Skills::PreparatoryTouch => 40,
-            Skills::Groundwork => 18,
-            Skills::DelicateSynthesis => 32,
-            Skills::IntensiveSynthesis => 6,
-            Skills::TrainedEye => 250,
-            Skills::AdvancedTouch => 46,
-            Skills::PrudentSynthesis => 18,
-            Skills::TrainedFinesse => 32,
-            Skills::CarefulObservation => 0,
-            Skills::HeartAndSoul => 0,
-        }
-    }
     fn unlock_level(&self) -> u8 {
         match self {
             Skills::BasicSynthesis => 1,
@@ -314,7 +275,9 @@ pub struct Attributes {
 }
 
 impl Attributes {
-    fn level_value(&self) -> i32 { data::level_table(self.level) }
+    fn level_value(&self) -> i32 {
+        data::level_table(self.level)
+    }
 }
 
 /// 储存了一次制作中配方的信息。
@@ -367,7 +330,12 @@ pub struct Recipe {
 }
 
 impl Recipe {
-    pub fn new(rlv: i32, difficulty_factor: u16, quality_factor: u16, durability_factor: u16) -> Self {
+    pub fn new(
+        rlv: i32,
+        difficulty_factor: u16,
+        quality_factor: u16,
+        durability_factor: u16,
+    ) -> Self {
         let rt = data::recipe_level_table(rlv);
         Self {
             rlv,
@@ -388,27 +356,30 @@ impl Recipe {
 #[derive(Copy, Clone, Default)]
 pub struct Buffs {
     /// 坚信
-    pub muscle_memory: Option<DurationBuff>,
+    pub muscle_memory: u8,
     /// 阔步
-    pub great_strides: Option<DurationBuff>,
+    pub great_strides: u8,
     /// 崇敬
-    pub veneration: Option<DurationBuff>,
+    pub veneration: u8,
     /// 改革
-    pub innovation: Option<DurationBuff>,
+    pub innovation: u8,
     /// 内静
     pub inner_quiet: u8,
     /// 最终确认
-    pub final_appraisal: Option<DurationBuff>,
+    pub final_appraisal: u8,
     /// 掌握
-    pub manipulation: Option<DurationBuff>,
+    pub manipulation: u8,
     /// 俭约 OR 长期俭约
-    pub wast_not: Option<DurationBuff>,
+    pub wast_not: u8,
     /// 中级加工预备
     /// 假想buff，用于处理 加工-中级加工 的连击。
-    pub standard_touch_prepared: Option<DurationBuff>,
+    pub standard_touch_prepared: bool,
+    /// 上级加工预备
+    /// 假想buff，用于处理 加工-中级加工-上级加工 的连击。
+    pub advanced_touch_prepared: bool,
     /// 观察（注视预备）
     /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
-    pub observed: Option<DurationBuff>,
+    pub observed: bool,
 }
 
 /// StacksBuff 代表拥有层数的buff，且层数不会随着制作回合衰减，如内静。
@@ -419,54 +390,60 @@ pub struct StacksBuff(pub usize);
 #[derive(Copy, Clone, Debug)]
 pub struct DurationBuff(pub usize);
 
-fn fade(b: &mut Option<DurationBuff>) {
-    if let Some(DurationBuff(d)) = b {
-        if *d > 1 {
-            *d -= 1
-        } else {
-            *b = None
-        }
-    }
-}
-
 fn round_down(v: f32, scale: f32) -> f32 {
     (v * scale).floor() / scale
 }
 
 impl Buffs {
-    pub(crate) fn synthesis(&mut self, skill_e: f32) -> f32 {
+    pub(crate) fn synthesis(&self, skill_e: f32) -> f32 {
         let mut e = 0.0;
-        if self.muscle_memory.take().is_some() {
+        if self.muscle_memory > 0 {
             e += 1.0;
         }
-        if self.veneration.is_some() {
+        if self.veneration > 0 {
             e += 0.5;
         }
         skill_e * round_down(1.0 + e, 100.0)
     }
 
-    pub(crate) fn touch(&mut self, skill_e: f32) -> f32 {
+    pub(crate) fn apply_synthesis(&mut self) {
+        if self.muscle_memory > 0 {
+            self.muscle_memory = 0;
+        }
+    }
+
+    pub(crate) fn touch(&self, skill_e: f32) -> f32 {
         let mut bm = 1.0;
-        if self.great_strides.take().is_some() {
+        if self.great_strides > 0 {
             bm += 1.0;
         }
-        if self.innovation.is_some() {
+        if self.innovation > 0 {
             bm += 0.5;
         }
         let iq = 1.0 + self.inner_quiet as f32 * 0.1;
         skill_e * round_down(iq * bm, 100.0)
     }
 
-    pub(crate) fn fade(&mut self) {
-        fade(&mut self.muscle_memory);
-        fade(&mut self.great_strides);
-        fade(&mut self.veneration);
-        fade(&mut self.innovation);
-        fade(&mut self.final_appraisal);
-        fade(&mut self.manipulation);
-        fade(&mut self.wast_not);
-        fade(&mut self.standard_touch_prepared);
-        fade(&mut self.observed);
+    pub(crate) fn apply_touch(&mut self) {
+        if self.great_strides > 0 {
+            self.great_strides = 0;
+        }
+    }
+
+    pub(crate) fn next(&self) -> Self {
+        Self {
+            muscle_memory: self.muscle_memory.saturating_sub(1),
+            great_strides: self.great_strides.saturating_sub(1),
+            veneration: self.veneration.saturating_sub(1),
+            innovation: self.innovation.saturating_sub(1),
+            inner_quiet: self.inner_quiet,
+            final_appraisal: self.final_appraisal.saturating_sub(1),
+            manipulation: self.manipulation.saturating_sub(1),
+            wast_not: self.wast_not.saturating_sub(1),
+            standard_touch_prepared: false,
+            advanced_touch_prepared: false,
+            observed: false,
+        }
     }
 }
 
@@ -515,7 +492,9 @@ pub enum CastActionError {
     /// 该技能仅可在首次作业且用于等级低了10级及以上的配方时发动
     LevelGapMustGreaterThanTen,
     /// 该技能只有在内静的档数大于1时才可以使用
-    RequireInnerQuiet,
+    RequireInnerQuiet1,
+    /// 该技能只有在内静的档数为10时才可以使用
+    RequireInnerQuiet10,
 }
 
 impl Display for CastActionError {
@@ -529,7 +508,8 @@ impl Display for CastActionError {
             CastActionError::NotAllowedInWastNotBuff => "not allowed in wast not buff",
             CastActionError::OnlyAllowedInFirstStep => "only allowed in first step",
             CastActionError::LevelGapMustGreaterThanTen => "level gap must greater than 10",
-            CastActionError::RequireInnerQuiet => "require at least 1 stack of inner quiet",
+            CastActionError::RequireInnerQuiet1 => "require at least 1 stack of inner quiet",
+            CastActionError::RequireInnerQuiet10 => "require 10 stack of inner quiet",
         })
     }
 }
@@ -556,7 +536,7 @@ impl Status {
         if let Condition::Sturdy = self.condition {
             reduce -= reduce / 2;
         }
-        if self.buffs.wast_not.is_some() {
+        if self.buffs.wast_not > 0 {
             reduce -= reduce / 2;
         }
         reduce
@@ -575,30 +555,30 @@ impl Status {
     }
 
     pub fn calc_synthesis(&self, efficiency: f32) -> u16 {
-        let mut base = self.attributes.craftsmanship as f32 * 10.0
-            / self.recipe.progress_divider as f32 + 2.0;
+        let mut base =
+            self.attributes.craftsmanship as f32 * 10.0 / self.recipe.progress_divider as f32 + 2.0;
         if self.attributes.level_value() <= self.recipe.rlv {
             base *= self.recipe.progress_modifier as f32 * 0.01
         }
-        (base.floor() * self.condition.synth_ratio() * efficiency) as u16
+        (base.floor() * self.condition.synth_ratio() * self.buffs.synthesis(efficiency)) as u16
     }
 
     pub fn calc_touch(&self, efficiency: f32) -> i32 {
-        let mut base = self.attributes.control as f32 * 10.0
-            / self.recipe.quality_divider as f32 + 35.0;
+        let mut base =
+            self.attributes.control as f32 * 10.0 / self.recipe.quality_divider as f32 + 35.0;
         if self.attributes.level_value() <= self.recipe.rlv {
             base *= self.recipe.quality_modifier as f32 * 0.01
         }
-        (base.floor() * self.condition.touch_ratio() * efficiency) as i32
+        (base.floor() * self.condition.touch_ratio() * self.buffs.touch(efficiency)) as i32
     }
 
-    fn cast_synthesis(&mut self, cp: i32, durability: i32, efficiency: f32) {
-        let e = self.buffs.synthesis(efficiency);
-        self.progress += self.calc_synthesis(e);
+    fn cast_synthesis(&mut self, next_buff: &mut Buffs, durability: i32, efficiency: f32) {
+        self.progress += self.calc_synthesis(efficiency);
         self.consume_durability(durability);
-        self.consume_craft_point(cp);
+        next_buff.apply_synthesis();
         if self.progress >= self.recipe.difficulty {
-            self.progress = if self.buffs.final_appraisal.take().is_some() {
+            self.progress = if next_buff.final_appraisal > 0 {
+                next_buff.final_appraisal = 0;
                 self.recipe.difficulty - 1
             } else {
                 self.recipe.difficulty
@@ -606,163 +586,230 @@ impl Status {
         }
     }
 
-    fn cast_touch(&mut self, cp: i32, durability: i32, efficiency: f32, inner_quiet_addon: i8) {
-        let e = self.buffs.touch(efficiency);
-        let quality_addon = self.calc_touch(e);
+    fn cast_touch(
+        &mut self,
+        next_buff: &mut Buffs,
+        durability: i32,
+        efficiency: f32,
+        inner_quiet_addon: i8,
+    ) {
+        let quality_addon = self.calc_touch(efficiency);
         self.quality = (self.quality + quality_addon).min(self.recipe.quality);
         self.consume_durability(durability);
-        self.consume_craft_point(cp);
-        self.buffs.inner_quiet = (self.buffs.inner_quiet.saturating_add_signed(inner_quiet_addon)).min(10);
+        next_buff.apply_touch();
+        next_buff.inner_quiet = self
+            .buffs
+            .inner_quiet
+            .saturating_add_signed(inner_quiet_addon)
+            .min(10);
     }
 
-    pub fn new_duration_buff(&self, dt: usize) -> Option<DurationBuff> {
-        let mut a = 1;
+    pub fn new_duration_buff(&self, dt: u8) -> u8 {
         if let Condition::Primed = self.condition {
-            a += 2
+            dt + 2
+        } else {
+            dt
         }
-        Some(DurationBuff(dt + a))
+    }
+
+    fn craft_point(&self, skill: Skills) -> i32 {
+        match skill {
+            Skills::BasicSynthesis => 0,
+            Skills::BasicTouch => 18,
+            Skills::MastersMend => 88,
+            Skills::HastyTouch => 0,
+            Skills::RapidSynthesis => 0,
+            Skills::Observe => 7,
+            Skills::TricksOfTheTrade => 0,
+            Skills::WasteNot => 56,
+            Skills::Veneration => 18,
+            Skills::StandardTouch => {
+                if self.buffs.standard_touch_prepared {
+                    32
+                } else {
+                    18
+                }
+            }
+            Skills::GreatStrides => 32,
+            Skills::Innovation => 18,
+            Skills::FinalAppraisal => 1,
+            Skills::WasteNotII => 98,
+            Skills::ByregotsBlessing => 24,
+            Skills::PreciseTouch => 18,
+            Skills::MuscleMemory => 6,
+            Skills::CarefulSynthesis => 7,
+            Skills::Manipulation => 96,
+            Skills::PrudentTouch => 25,
+            Skills::FocusedSynthesis => 5,
+            Skills::FocusedTouch => 18,
+            Skills::Reflect => 6,
+            Skills::PreparatoryTouch => 40,
+            Skills::Groundwork => 18,
+            Skills::DelicateSynthesis => 32,
+            Skills::IntensiveSynthesis => 6,
+            Skills::TrainedEye => 250,
+            Skills::AdvancedTouch => {
+                if self.buffs.advanced_touch_prepared {
+                    46
+                } else {
+                    18
+                }
+            }
+            Skills::PrudentSynthesis => 18,
+            Skills::TrainedFinesse => 32,
+            Skills::CarefulObservation => 0,
+            Skills::HeartAndSoul => 0,
+        }
     }
 
     /// 发动一次技能。
-    pub fn cast_action(&mut self, action: Skills) {
+    pub fn cast_action(&self, action: Skills) -> Result<Self, CastActionError> {
+        self.is_action_allowed(action)?;
+        let mut next_state = *self;
+        let mut next_buffs = self.buffs.next();
+        next_state.consume_craft_point(self.craft_point(action));
         match action {
-            Skills::BasicSynthesis => {
-                self.cast_synthesis(0, 10, if self.attributes.level < 31 { 1.0 } else { 1.2 })
-            }
-            Skills::RapidSynthesis => {
-                self.cast_synthesis(0, 10, if self.attributes.level < 63 { 2.5 } else { 5.0 })
-            }
-            Skills::CarefulSynthesis => {
-                self.cast_synthesis(7, 10, if self.attributes.level < 82 { 1.5 } else { 1.8 })
-            }
-            Skills::FocusedSynthesis => self.cast_synthesis(5, 10, 2.0),
+            Skills::BasicSynthesis => next_state.cast_synthesis(
+                &mut next_buffs,
+                10,
+                if self.attributes.level < 31 { 1.0 } else { 1.2 },
+            ),
+            Skills::RapidSynthesis => next_state.cast_synthesis(
+                &mut next_buffs,
+                10,
+                if self.attributes.level < 63 { 2.5 } else { 5.0 },
+            ),
+            Skills::CarefulSynthesis => next_state.cast_synthesis(
+                &mut next_buffs,
+                10,
+                if self.attributes.level < 82 { 1.5 } else { 1.8 },
+            ),
+            Skills::FocusedSynthesis => next_state.cast_synthesis(&mut next_buffs, 10, 2.0),
             Skills::Groundwork => {
                 let mut e = if self.attributes.level < 86 { 3.0 } else { 3.6 };
                 let d = self.calc_durability(20);
-                if self.durability < d { e *= 0.5 };
-                self.cast_synthesis(18, 20, e)
+                if self.durability < d {
+                    e *= 0.5
+                };
+                next_state.cast_synthesis(&mut next_buffs, 20, e)
             }
-            Skills::IntensiveSynthesis => self.cast_synthesis(6, 10, 4.0),
+            Skills::IntensiveSynthesis => next_state.cast_synthesis(&mut next_buffs, 10, 4.0),
+            Skills::PrudentSynthesis => next_state.cast_synthesis(&mut next_buffs, 5, 1.8),
 
             Skills::DelicateSynthesis => {
-                self.cast_synthesis(16, 0, 1.0);
-                self.cast_touch(16, 10, 1.0, 1);
+                next_state.cast_synthesis(&mut next_buffs, 0, 1.0);
+                next_state.cast_touch(&mut next_buffs, 10, 1.0, 1);
             }
 
             Skills::BasicTouch => {
-                self.buffs.standard_touch_prepared = Some(DurationBuff(1 + 1));
-                self.cast_touch(18, 10, 1.0, 1)
+                next_state.cast_touch(&mut next_buffs, 10, 1.0, 1);
+                next_buffs.standard_touch_prepared = true;
             }
-            Skills::HastyTouch => self.cast_touch(0, 10, 1.0, 1),
+            Skills::HastyTouch => next_state.cast_touch(&mut next_buffs, 10, 1.0, 1),
             Skills::StandardTouch => {
-                let cp = match self.buffs.standard_touch_prepared {
-                    None => 32,
-                    Some(_) => 18,
+                if self.buffs.standard_touch_prepared {
+                    next_buffs.advanced_touch_prepared = true;
                 };
-                self.cast_touch(cp, 10, 1.25, 1)
+                next_state.cast_touch(&mut next_buffs, 10, 1.25, 1)
             }
+            Skills::AdvancedTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 1),
             Skills::ByregotsBlessing => {
                 let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).max(3.0);
-                self.cast_touch(24, 10, e, -(self.buffs.inner_quiet as i8));
+                next_state.cast_touch(&mut next_buffs, 10, e, -(self.buffs.inner_quiet as i8));
             }
-            Skills::PreciseTouch => self.cast_touch(18, 10, 1.5, 2),
-            Skills::PrudentTouch => self.cast_touch(25, 5, 1.0, 1),
-            Skills::FocusedTouch => self.cast_touch(18, 10, 1.5, 1),
-            Skills::PreparatoryTouch => self.cast_touch(40, 20, 2.0, 2),
+            Skills::PreciseTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 2),
+            Skills::PrudentTouch => next_state.cast_touch(&mut next_buffs, 5, 1.0, 1),
+            Skills::FocusedTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 1),
+            Skills::PreparatoryTouch => next_state.cast_touch(&mut next_buffs, 20, 2.0, 2),
+            Skills::TrainedFinesse => next_state.cast_touch(&mut next_buffs, 0, 1.0, 0),
 
             Skills::TricksOfTheTrade => {
-                self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
+                next_state.craft_points =
+                    (self.craft_points + 20).min(self.attributes.craft_points);
             }
 
             Skills::MastersMend => {
-                self.consume_craft_point(88);
-                self.durability = self.recipe.durability.min(self.durability + 30);
+                next_state.durability = self.recipe.durability.min(next_state.durability + 30);
             }
             Skills::WasteNot => {
-                self.consume_craft_point(56);
-                self.buffs.wast_not = self.new_duration_buff(4);
+                next_buffs.wast_not = self.new_duration_buff(4);
             }
             Skills::WasteNotII => {
-                self.consume_craft_point(98);
-                self.buffs.wast_not = self.new_duration_buff(8);
+                next_buffs.wast_not = self.new_duration_buff(8);
             }
             Skills::Manipulation => {
-                self.consume_craft_point(96);
-                self.buffs.manipulation = self.new_duration_buff(8);
+                next_buffs.manipulation = self.new_duration_buff(8);
+                next_state.buffs = next_buffs;
+                next_state.condition = Condition::Normal;
+                next_state.step += 1;
+                return Ok(next_state);
             }
             Skills::MuscleMemory => {
-                self.cast_synthesis(6, 10, 3.0);
-                self.buffs.muscle_memory = self.new_duration_buff(5);
+                next_state.cast_synthesis(&mut next_buffs, 10, 3.0);
+                next_buffs.muscle_memory = self.new_duration_buff(5);
             }
             Skills::Reflect => {
-                self.cast_touch(24, 10, 1.0, 2);
+                next_state.cast_touch(&mut next_buffs, 10, 1.0, 2);
             }
             Skills::TrainedEye => {
-                self.consume_craft_point(250);
-                self.quality += self.recipe.quality;
+                next_state.quality += self.recipe.quality;
             }
             Skills::Veneration => {
-                self.consume_craft_point(18);
-                self.buffs.veneration = self.new_duration_buff(4);
+                next_buffs.veneration = self.new_duration_buff(4);
             }
             Skills::GreatStrides => {
-                self.consume_craft_point(32);
-                self.buffs.great_strides = self.new_duration_buff(3);
+                next_buffs.great_strides = self.new_duration_buff(3);
             }
             Skills::Innovation => {
-                self.consume_craft_point(18);
-                self.buffs.innovation = self.new_duration_buff(4);
+                next_buffs.innovation = self.new_duration_buff(4);
             }
             Skills::Observe => {
-                self.consume_craft_point(7);
-                self.buffs.observed = Some(DurationBuff(1 + 1));
+                next_buffs.observed = true;
             }
             Skills::FinalAppraisal => {
-                self.consume_craft_point(1);
-                self.buffs.final_appraisal = self.new_duration_buff(5);
-                return;
+                next_buffs.final_appraisal = self.new_duration_buff(5);
+                next_state.buffs = next_buffs;
+                next_state.condition = Condition::Normal;
+                next_state.step += 1;
+                return Ok(next_state);
             }
-            Skills::AdvancedTouch => todo!(),
-            Skills::PrudentSynthesis => todo!(),
-            Skills::TrainedFinesse => todo!(),
             Skills::CarefulObservation => {
-                self.condition = Condition::Normal;
-                return;
+                next_state.condition = Condition::Normal;
+                next_state.buffs = next_buffs;
+                return Ok(next_state);
             }
             Skills::HeartAndSoul => todo!(),
         }
-        if !matches!(action, Skills::Manipulation)
-            && self.buffs.manipulation.is_some()
-            && self.durability > 0
-        {
-            self.durability = self.recipe.durability.min(self.durability + 5);
+        if self.buffs.manipulation > 0 && self.durability > 0 {
+            next_state.durability += 5;
+            next_state.durability = next_state.durability.min(self.recipe.durability);
         }
-        self.buffs.fade();
-        self.condition = Condition::Normal;
-        self.step += 1;
+        next_state.buffs = next_buffs;
+        next_state.condition = Condition::Normal;
+        next_state.step += 1;
+        Ok(next_state)
     }
 
     /// 发动一次技能，并且失败。
-    pub fn fail_action(&mut self, action: Skills) {
+    pub fn fail_action(&self, action: Skills) -> Result<Status, CastActionError> {
+        self.is_action_allowed(action)?;
+        let mut next_state = *self;
+        next_state.consume_craft_point(self.craft_point(action));
         match action {
-            Skills::HastyTouch => self.consume_durability(10),
-            Skills::RapidSynthesis => self.consume_durability(10),
-            Skills::FocusedSynthesis => {
-                self.consume_durability(10);
-                self.consume_craft_point(5);
-            }
-            Skills::FocusedTouch => {
-                self.consume_durability(10);
-                self.consume_craft_point(18);
-            }
+            Skills::HastyTouch => next_state.consume_durability(10),
+            Skills::RapidSynthesis => next_state.consume_durability(10),
+            Skills::FocusedSynthesis => next_state.consume_durability(10),
+            Skills::FocusedTouch => next_state.consume_durability(10),
             _ => panic!("action {:?} never fail", action),
         }
-        if self.durability > 0 && self.buffs.manipulation.is_some() {
-            self.durability = self.recipe.durability.min(self.durability + 5);
+        if self.durability > 0 && self.buffs.manipulation > 0 {
+            next_state.durability += 5;
+            next_state.durability = next_state.durability.min(self.recipe.durability);
         }
-        self.buffs.fade();
-        self.condition = Condition::Normal;
-        self.step += 1;
+        next_state.buffs = self.buffs.next();
+        next_state.condition = Condition::Normal;
+        next_state.step += 1;
+        Ok(next_state)
     }
 
     /// 计算当前状态下某技能的成功概率，返回结果介于[0_f32..=1_f32]之间。
@@ -773,30 +820,30 @@ impl Status {
         };
         addon
             + match action {
-            Skills::HastyTouch => 0.6,
-            Skills::RapidSynthesis => 0.5,
-            Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                if self.buffs.observed.is_some() {
-                    1.0
-                } else {
-                    0.5
+                Skills::HastyTouch => 0.6,
+                Skills::RapidSynthesis => 0.5,
+                Skills::FocusedSynthesis | Skills::FocusedTouch => {
+                    if self.buffs.observed {
+                        1.0
+                    } else {
+                        0.5
+                    }
                 }
+                _ => return 1.0,
             }
-            _ => return 1.0,
-        }
     }
 
     /// 当前状态是否允许发动某技能。
     pub fn is_action_allowed(&self, action: Skills) -> Result<(), CastActionError> {
         use CastActionError::{
             CraftPointNotEnough, CraftingAlreadyFinished, DurabilityNotEnough,
-            LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff,
-            OnlyAllowedInFirstStep, PlayerLevelTooLow, RequireGoodOrExcellent,
+            LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
+            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
         };
 
         let cp = {
             let mut reduce = 0;
-            let cp = action.craft_point();
+            let cp = self.craft_point(action);
             if let Condition::Pliant = self.condition {
                 reduce += cp / 2;
             }
@@ -807,9 +854,12 @@ impl Status {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent) => Err(RequireGoodOrExcellent),
+                if !matches!(self.condition, Condition::Good | Condition::Excellent) =>
+            {
+                Err(RequireGoodOrExcellent)
+            }
 
-            Skills::PrudentTouch if self.buffs.wast_not.is_some() => Err(NotAllowedInWastNotBuff),
+            Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => Err(NotAllowedInWastNotBuff),
 
             Skills::MuscleMemory | Skills::Reflect | Skills::TrainedEye if self.step != 0 => {
                 Err(OnlyAllowedInFirstStep)
@@ -819,7 +869,8 @@ impl Status {
                 Err(LevelGapMustGreaterThanTen)
             }
 
-            Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet),
+            Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
+            Skills::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
             _ if cp > self.craft_points => Err(CraftPointNotEnough),
@@ -842,65 +893,7 @@ impl Status {
     /// if 89 is returned, it means that the probability is 89%.
     pub fn high_quality_probability(&self) -> Option<i32> {
         let percent = self.quality * 100 / self.recipe.quality;
-        match percent {
-            0 => Some(1),
-            5 => Some(2),
-            9 => Some(3),
-            13 => Some(4),
-            17 => Some(5),
-            21 => Some(6),
-            25 => Some(7),
-            29 => Some(8),
-            32 => Some(9),
-            35 => Some(10),
-            38 => Some(11),
-            41 => Some(12),
-            44 => Some(13),
-            47 => Some(14),
-            50 => Some(15),
-            53 => Some(16),
-            55 => Some(17),
-            58 => Some(18),
-            61 => Some(19),
-            63 => Some(20),
-            65 => Some(21),
-            66 => Some(22),
-            67 => Some(23),
-            68 => Some(24),
-            69 => Some(26),
-            70 => Some(28),
-            71 => Some(31),
-            72 => Some(34),
-            73 => Some(38),
-            74 => Some(42),
-            75 => Some(47),
-            76 => Some(52),
-            77 => Some(58),
-            78 => Some(64),
-            79 => Some(68),
-            80 => Some(71),
-            81 => Some(74),
-            82 => Some(76),
-            83 => Some(78),
-            84 => Some(80),
-            85 => Some(81),
-            86 => Some(82),
-            87 => Some(83),
-            88 => Some(84),
-            89 => Some(85),
-            90 => Some(86),
-            91 => Some(87),
-            92 => Some(88),
-            93 => Some(89),
-            94 => Some(90),
-            95 => Some(91),
-            96 => Some(92),
-            97 => Some(94),
-            98 => Some(96),
-            99 => Some(98),
-            100 => Some(100),
-            _ => None,
-        }
+        data::high_quality_table(percent)
     }
 }
 
@@ -985,7 +978,7 @@ impl Iterator for ConditionIterator {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Condition, data};
+    use crate::{data, Condition};
 
     use super::{Attributes, Recipe, Skills, Status};
 
@@ -1002,11 +995,10 @@ mod tests {
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
-            s.cast_action(Skills::BasicSynthesis);
+            s = s.cast_action(Skills::BasicSynthesis).unwrap();
             assert_eq!(s.progress, pg);
         }
     }
-
 
     #[test]
     fn delicate_synth() {
@@ -1027,19 +1019,82 @@ mod tests {
             co: u8,
         }
         for (i, step) in [
-            Step { a: Skills::DelicateSynthesis, pg: 230, qu: 301, du: 70, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 460, qu: 632, du: 60, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 690, qu: 993, du: 50, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 920, qu: 1384, du: 40, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 1150, qu: 1805, du: 30, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 1380, qu: 2256, du: 20, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 1610, qu: 2737, du: 10, co: 1 },
-            Step { a: Skills::DelicateSynthesis, pg: 1840, qu: 3248, du: 0, co: 1 },
-        ].iter().enumerate() {
-            s.cast_action(step.a);
-            assert_eq!(s.progress, step.pg, "step [{}] progress simulation fail: want {}, get {}", i, step.pg, s.progress);
-            assert_eq!(s.quality, step.qu, "step [{}] quality simulation fail: want {}, get {}", i, step.qu, s.quality);
-            assert_eq!(s.durability, step.du, "step [{}] durability simulation fail: want {}, get {}", i, step.du, s.durability);
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 230,
+                qu: 301,
+                du: 70,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 460,
+                qu: 632,
+                du: 60,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 690,
+                qu: 993,
+                du: 50,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 920,
+                qu: 1384,
+                du: 40,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 1150,
+                qu: 1805,
+                du: 30,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 1380,
+                qu: 2256,
+                du: 20,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 1610,
+                qu: 2737,
+                du: 10,
+                co: 1,
+            },
+            Step {
+                a: Skills::DelicateSynthesis,
+                pg: 1840,
+                qu: 3248,
+                du: 0,
+                co: 1,
+            },
+        ]
+        .iter()
+        .enumerate()
+        {
+            s = s.cast_action(step.a).unwrap();
+            assert_eq!(
+                s.progress, step.pg,
+                "step [{}] progress simulation fail: want {}, get {}",
+                i, step.pg, s.progress
+            );
+            assert_eq!(
+                s.quality, step.qu,
+                "step [{}] quality simulation fail: want {}, get {}",
+                i, step.qu, s.quality
+            );
+            assert_eq!(
+                s.durability, step.du,
+                "step [{}] durability simulation fail: want {}, get {}",
+                i, step.du, s.durability
+            );
             s.condition = map_cond(step.co);
         }
     }
@@ -1062,37 +1117,187 @@ mod tests {
             du: i32,
             co: u8,
         }
-        for (i, step) in [
-            Step { a: 100390, pg: 0, qu: 288, du: 70, co: 2 },
-            Step { a: 100131, pg: 0, qu: 1065, du: 60, co: 1 },
-            Step { a: 4577, pg: 0, qu: 1065, du: 60, co: 1 },
-            Step { a: 100230, pg: 0, qu: 1468, du: 60, co: 3 },
-            Step { a: 100302, pg: 0, qu: 4924, du: 45, co: 4 },
-            Step { a: 100082, pg: 0, qu: 4924, du: 50, co: 1 },
-            Step { a: 100246, pg: 0, qu: 5658, du: 45, co: 1 },
-            Step { a: 100342, pg: 0, qu: 6700, du: 40, co: 1 },
-            Step { a: 19300, pg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 100075, pg: 403, qu: 6700, du: 40, co: 1 },
-            Step { a: 100075, pg: 806, qu: 6700, du: 35, co: 1 },
-            Step { a: 100075, pg: 1209, qu: 6700, du: 25, co: 1 },
-            Step { a: 100075, pg: 1612, qu: 6700, du: 15, co: 1 },
-            Step { a: 100077, pg: 1612, qu: 6700, du: 45, co: 1 },
-            Step { a: 19300, pg: 1612, qu: 6700, du: 45, co: 1 },
-            Step { a: 100082, pg: 1612, qu: 6700, du: 45, co: 1 },
-            Step { a: 100246, pg: 1612, qu: 6700, du: 35, co: 1 },
-            Step { a: 100082, pg: 1612, qu: 6700, du: 35, co: 1 },
-            Step { a: 100238, pg: 2284, qu: 6700, du: 25, co: 1 },
-            Step { a: 100082, pg: 2284, qu: 6700, du: 25, co: 1 },
-            Step { a: 100238, pg: 2732, qu: 6700, du: 15, co: 1 },
-            Step { a: 100082, pg: 2732, qu: 6700, du: 15, co: 1 },
-            Step { a: 100238, pg: 3000, qu: 6700, du: 5, co: 1 },
-        ].iter().enumerate() {
+        for step in [
+            Step {
+                a: 100390,
+                pg: 0,
+                qu: 288,
+                du: 70,
+                co: 2,
+            },
+            Step {
+                a: 100131,
+                pg: 0,
+                qu: 1065,
+                du: 60,
+                co: 1,
+            },
+            Step {
+                a: 4577,
+                pg: 0,
+                qu: 1065,
+                du: 60,
+                co: 1,
+            },
+            Step {
+                a: 100230,
+                pg: 0,
+                qu: 1468,
+                du: 60,
+                co: 3,
+            },
+            Step {
+                a: 100302,
+                pg: 0,
+                qu: 4924,
+                du: 45,
+                co: 4,
+            },
+            Step {
+                a: 100082,
+                pg: 0,
+                qu: 4924,
+                du: 50,
+                co: 1,
+            },
+            Step {
+                a: 100246,
+                pg: 0,
+                qu: 5658,
+                du: 45,
+                co: 1,
+            },
+            Step {
+                a: 100342,
+                pg: 0,
+                qu: 6700,
+                du: 40,
+                co: 1,
+            },
+            Step {
+                a: 19300,
+                pg: 0,
+                qu: 6700,
+                du: 45,
+                co: 1,
+            },
+            Step {
+                a: 100075,
+                pg: 403,
+                qu: 6700,
+                du: 40,
+                co: 1,
+            },
+            Step {
+                a: 100075,
+                pg: 806,
+                qu: 6700,
+                du: 35,
+                co: 1,
+            },
+            Step {
+                a: 100075,
+                pg: 1209,
+                qu: 6700,
+                du: 25,
+                co: 1,
+            },
+            Step {
+                a: 100075,
+                pg: 1612,
+                qu: 6700,
+                du: 15,
+                co: 1,
+            },
+            Step {
+                a: 100077,
+                pg: 1612,
+                qu: 6700,
+                du: 45,
+                co: 1,
+            },
+            Step {
+                a: 19300,
+                pg: 1612,
+                qu: 6700,
+                du: 45,
+                co: 1,
+            },
+            Step {
+                a: 100082,
+                pg: 1612,
+                qu: 6700,
+                du: 45,
+                co: 1,
+            },
+            Step {
+                a: 100246,
+                pg: 1612,
+                qu: 6700,
+                du: 35,
+                co: 1,
+            },
+            Step {
+                a: 100082,
+                pg: 1612,
+                qu: 6700,
+                du: 35,
+                co: 1,
+            },
+            Step {
+                a: 100238,
+                pg: 2284,
+                qu: 6700,
+                du: 25,
+                co: 1,
+            },
+            Step {
+                a: 100082,
+                pg: 2284,
+                qu: 6700,
+                du: 25,
+                co: 1,
+            },
+            Step {
+                a: 100238,
+                pg: 2732,
+                qu: 6700,
+                du: 15,
+                co: 1,
+            },
+            Step {
+                a: 100082,
+                pg: 2732,
+                qu: 6700,
+                du: 15,
+                co: 1,
+            },
+            Step {
+                a: 100238,
+                pg: 3000,
+                qu: 6700,
+                du: 5,
+                co: 1,
+            },
+        ] {
             let skill = data::action_table(step.a).unwrap();
-            println!("casting: {:?}", skill);
-            s.cast_action(skill);
-            assert_eq!(s.progress, step.pg, "step [{:?}] progress simulation fail: want {}, get {}", skill, step.pg, s.progress);
-            assert_eq!(s.quality, step.qu, "step [{:?}] quality simulation fail: want {}, get {}", skill, step.qu, s.quality);
-            assert_eq!(s.durability, step.du, "step [{:?}] durability simulation fail: want {}, get {}", skill, step.du, s.durability);
+            s = s.cast_action(skill).unwrap();
+            // println!("casting: {:?}", skill);
+            assert_eq!(
+                s.progress, step.pg,
+                "step [{:?}] progress simulation fail: want {}, get {}",
+                skill, step.pg, s.progress
+            );
+            assert_eq!(
+                s.quality, step.qu,
+                "step [{:?}] quality simulation fail: want {}, get {}",
+                skill, step.qu, s.quality
+            );
+            assert_eq!(
+                s.durability, step.du,
+                "step [{:?}] durability simulation fail: want {}, get {}",
+                skill, step.du, s.durability
+            );
             s.condition = map_cond(step.co);
         }
     }
@@ -1116,7 +1321,7 @@ mod tests {
             co: u8,
             su: bool,
         }
-        for (i, step) in [
+        for step in [
             Step { a: 100390, pg: 0, qu: 247, du: 50, co: 9, su: true },
             Step { a: 19300, pg: 0, qu: 247, du: 50, co: 1, su: true },
             Step { a: 100366, pg: 0, qu: 247, du: 40, co: 2, su: false },
@@ -1159,17 +1364,29 @@ mod tests {
             Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
             Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
             Step { a: 100075, pg: 5470, qu: 7923, du: 25, co: 1, su: true },
-        ].iter().enumerate() {
+        ] {
             let skill = data::action_table(step.a).unwrap();
-            println!("casting: {:?}", skill);
+            // println!("casting: {:?} {}", skill,  s.craft_points);
             if step.su {
-                s.cast_action(skill);
+                s = s.cast_action(skill).unwrap();
             } else {
-                s.fail_action(skill);
+                s = s.fail_action(skill).unwrap();
             }
-            assert_eq!(s.progress, step.pg, "step [{:?}] progress simulation fail: want {}, get {}", skill, step.pg, s.progress);
-            assert_eq!(s.quality, step.qu, "step [{:?}] quality simulation fail: want {}, get {}", skill, step.qu, s.quality);
-            assert_eq!(s.durability, step.du, "step [{:?}] durability simulation fail: want {}, get {}", skill, step.du, s.durability);
+            assert_eq!(
+                s.progress, step.pg,
+                "step [{:?}] progress simulation fail: want {}, get {}",
+                skill, step.pg, s.progress
+            );
+            assert_eq!(
+                s.quality, step.qu,
+                "step [{:?}] quality simulation fail: want {}, get {}",
+                skill, step.qu, s.quality
+            );
+            assert_eq!(
+                s.durability, step.du,
+                "step [{:?}] durability simulation fail: want {}, get {}",
+                skill, step.du, s.durability
+            );
             s.condition = map_cond(step.co);
         }
     }
@@ -1185,7 +1402,7 @@ mod tests {
             7 => Condition::Pliant,
             8 => Condition::Malleable,
             9 => Condition::Primed,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
