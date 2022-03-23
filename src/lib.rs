@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[cfg(feature = "serde-support")]
 use serde::{Deserialize, Serialize};
+
 use crate::CastActionError::RequireInnerQuiet;
 
 mod data;
@@ -514,7 +515,7 @@ pub enum CastActionError {
     /// 该技能仅可在首次作业且用于等级低了10级及以上的配方时发动
     LevelGapMustGreaterThanTen,
     /// 该技能只有在内静的档数大于1时才可以使用
-    RequireInnerQuiet
+    RequireInnerQuiet,
 }
 
 impl Display for CastActionError {
@@ -1071,10 +1072,10 @@ mod tests {
             Step { a: 100246, pg: 0, qu: 5658, du: 45, co: 1 },
             Step { a: 100342, pg: 0, qu: 6700, du: 40, co: 1 },
             Step { a: 19300, pg: 0, qu: 6700, du: 45, co: 1 },
-            Step { a: 100075, pg: 403,  qu: 6700, du: 40, co: 1 },
-            Step { a: 100075, pg: 806,  qu: 6700, du: 35, co: 1 },
-            Step { a: 100075, pg: 1209,  qu: 6700, du: 25, co: 1 },
-            Step { a: 100075, pg: 1612,  qu: 6700, du: 15, co: 1 },
+            Step { a: 100075, pg: 403, qu: 6700, du: 40, co: 1 },
+            Step { a: 100075, pg: 806, qu: 6700, du: 35, co: 1 },
+            Step { a: 100075, pg: 1209, qu: 6700, du: 25, co: 1 },
+            Step { a: 100075, pg: 1612, qu: 6700, du: 15, co: 1 },
             Step { a: 100077, pg: 1612, qu: 6700, du: 45, co: 1 },
             Step { a: 19300, pg: 1612, qu: 6700, du: 45, co: 1 },
             Step { a: 100082, pg: 1612, qu: 6700, du: 45, co: 1 },
@@ -1082,13 +1083,90 @@ mod tests {
             Step { a: 100082, pg: 1612, qu: 6700, du: 35, co: 1 },
             Step { a: 100238, pg: 2284, qu: 6700, du: 25, co: 1 },
             Step { a: 100082, pg: 2284, qu: 6700, du: 25, co: 1 },
-            Step { a: 100238, pg: 2732,  qu: 6700, du: 15, co: 1 },
+            Step { a: 100238, pg: 2732, qu: 6700, du: 15, co: 1 },
             Step { a: 100082, pg: 2732, qu: 6700, du: 15, co: 1 },
-            Step { a: 100238, pg: 3000,  qu: 6700, du: 5, co: 1 },
+            Step { a: 100238, pg: 3000, qu: 6700, du: 5, co: 1 },
         ].iter().enumerate() {
             let skill = data::action_table(step.a).unwrap();
             println!("casting: {:?}", skill);
             s.cast_action(skill);
+            assert_eq!(s.progress, step.pg, "step [{:?}] progress simulation fail: want {}, get {}", skill, step.pg, s.progress);
+            assert_eq!(s.quality, step.qu, "step [{:?}] quality simulation fail: want {}, get {}", skill, step.qu, s.quality);
+            assert_eq!(s.durability, step.du, "step [{:?}] durability simulation fail: want {}, get {}", skill, step.du, s.durability);
+            s.condition = map_cond(step.co);
+        }
+    }
+
+    #[test]
+    fn resplendent() {
+        let attr = Attributes {
+            level: 82,
+            craftsmanship: 2786,
+            control: 2764,
+            craft_points: 533,
+        };
+        let recipe = Recipe::new(516, 100, 100, 86);
+        let mut s = Status::new(attr, recipe);
+
+        struct Step {
+            a: i32,
+            pg: u16,
+            qu: i32,
+            du: i32,
+            co: u8,
+            su: bool,
+        }
+        for (i, step) in [
+            Step { a: 100390, pg: 0, qu: 247, du: 50, co: 9, su: true },
+            Step { a: 19300, pg: 0, qu: 247, du: 50, co: 1, su: true },
+            Step { a: 100366, pg: 0, qu: 247, du: 40, co: 2, su: false },
+            Step { a: 100318, pg: 1206, qu: 247, du: 30, co: 6, su: true },
+            Step { a: 100366, pg: 1206, qu: 247, du: 25, co: 7, su: false },
+            Step { a: 4577, pg: 1206, qu: 247, du: 25, co: 5, su: true },
+            Step { a: 100366, pg: 2713, qu: 247, du: 20, co: 6, su: true },
+            Step { a: 100366, pg: 2713, qu: 247, du: 20, co: 2, su: false },
+            Step { a: 100131, pg: 2713, qu: 913, du: 15, co: 5, su: true },
+            Step { a: 100358, pg: 2713, qu: 913, du: 10, co: 6, su: false },
+            Step { a: 100358, pg: 2713, qu: 1258, du: 10, co: 6, su: true },
+            Step { a: 100358, pg: 2713, qu: 1628, du: 10, co: 1, su: true },
+            Step { a: 100082, pg: 2713, qu: 1628, du: 15, co: 1, su: true },
+            Step { a: 100246, pg: 2713, qu: 2220, du: 10, co: 2, su: true },
+            Step { a: 100374, pg: 2713, qu: 2220, du: 10, co: 8, su: true },
+            Step { a: 100077, pg: 2713, qu: 2220, du: 40, co: 6, su: true },
+            Step { a: 100366, pg: 3718, qu: 2220, du: 35, co: 2, su: true },
+            Step { a: 100131, pg: 3718, qu: 3164, du: 25, co: 2, su: true },
+            Step { a: 100131, pg: 3718, qu: 4219, du: 15, co: 7, su: true },
+            Step { a: 100077, pg: 3718, qu: 4219, du: 45, co: 1, su: true },
+            Step { a: 100366, pg: 3718, qu: 4219, du: 35, co: 1, su: false },
+            Step { a: 100366, pg: 4723, qu: 4219, du: 25, co: 2, su: true },
+            Step { a: 100374, pg: 4723, qu: 4219, du: 25, co: 6, su: true },
+            Step { a: 100358, pg: 4723, qu: 4219, du: 20, co: 1, su: false },
+            Step { a: 19007, pg: 4723, qu: 4219, du: 20, co: 6, su: true },
+            Step { a: 100082, pg: 4723, qu: 4219, du: 20, co: 7, su: true },
+            Step { a: 100246, pg: 4723, qu: 5330, du: 10, co: 9, su: true },
+            Step { a: 100077, pg: 4723, qu: 5330, du: 40, co: 5, su: true },
+            Step { a: 100082, pg: 4723, qu: 5330, du: 40, co: 6, su: true },
+            Step { a: 100246, pg: 4723, qu: 6071, du: 35, co: 8, su: true },
+            Step { a: 100075, pg: 5084, qu: 6071, du: 25, co: 8, su: true },
+            Step { a: 100075, pg: 5445, qu: 6071, du: 15, co: 2, su: true },
+            Step { a: 100374, pg: 5445, qu: 6071, du: 15, co: 2, su: true },
+            Step { a: 100374, pg: 5445, qu: 6071, du: 15, co: 9, su: true },
+            Step { a: 263, pg: 5445, qu: 6071, du: 15, co: 9, su: true },
+            Step { a: 19007, pg: 5445, qu: 6071, du: 15, co: 5, su: true },
+            Step { a: 100082, pg: 5445, qu: 6071, du: 15, co: 1, su: true },
+            Step { a: 100246, pg: 5445, qu: 7923, du: 5, co: 8, su: true },
+            Step { a: 100077, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
+            Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
+            Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
+            Step { a: 100075, pg: 5470, qu: 7923, du: 25, co: 1, su: true },
+        ].iter().enumerate() {
+            let skill = data::action_table(step.a).unwrap();
+            println!("casting: {:?}", skill);
+            if step.su {
+                s.cast_action(skill);
+            } else {
+                s.fail_action(skill);
+            }
             assert_eq!(s.progress, step.pg, "step [{:?}] progress simulation fail: want {}, get {}", skill, step.pg, s.progress);
             assert_eq!(s.quality, step.qu, "step [{:?}] quality simulation fail: want {}, get {}", skill, step.qu, s.quality);
             assert_eq!(s.durability, step.du, "step [{:?}] durability simulation fail: want {}, get {}", skill, step.du, s.durability);
