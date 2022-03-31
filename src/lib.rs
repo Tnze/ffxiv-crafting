@@ -1,17 +1,23 @@
 #![feature(mixed_integer_ops)]
+#![cfg_attr(test, feature(test))]
+
+#[cfg(test)]
+extern crate test;
 
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
 #[cfg(feature = "serde-support")]
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 mod data;
 pub mod export;
 
 /// 代表一个玩家在作业时可以使用的一个技能的枚举。
-#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum Skills {
@@ -48,6 +54,41 @@ pub enum Skills {
     TrainedFinesse,
     CarefulObservation,
     HeartAndSoul,
+}
+
+#[cfg(feature = "serde-support")]
+impl Serialize for Skills {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.into())
+    }
+}
+
+#[cfg(feature = "serde-support")]
+impl<'de> Deserialize<'de> for Skills {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StrVisitor;
+        impl<'de> Visitor<'de> for StrVisitor {
+            type Value = Skills;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                formatter.write_str("a string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Skills::try_from(v).map_err(de::Error::custom)
+            }
+        }
+        deserializer.deserialize_str(StrVisitor)
+    }
 }
 
 impl Skills {
@@ -168,13 +209,15 @@ impl TryFrom<&str> for Skills {
             "trained_finesse" | "工匠的神技" => Skills::TrainedFinesse,
             "careful_observation" | "设计变动" => Skills::CarefulObservation,
             "heart_and_soul" | "专心致志" => Skills::HeartAndSoul,
-            _ => return Err(UnknownSkillErr()),
+            _ => return Err(UnknownSkillErr),
         })
     }
 }
 
 #[derive(Debug)]
-pub struct UnknownSkillErr();
+pub struct UnknownSkillErr;
+
+impl Error for UnknownSkillErr {}
 
 impl Display for UnknownSkillErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -182,9 +225,15 @@ impl Display for UnknownSkillErr {
     }
 }
 
-impl Error for UnknownSkillErr {}
+#[cfg(feature = "serde-support")]
+impl de::Error for UnknownSkillErr {
+    fn custom<T: Display>(_msg: T) -> Self {
+        Self
+    }
+}
 
 /// 代表了当前的“制作状态”，也就是俗称的球色。
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
 pub enum Condition {
     // 白：通常
@@ -262,7 +311,8 @@ impl Condition {
 }
 
 /// 玩家装备属性
-#[derive(Copy, Clone)]
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Attributes {
     /// 玩家等级
     pub level: u8,
@@ -281,7 +331,8 @@ impl Attributes {
 }
 
 /// 储存了一次制作中配方的信息。
-#[derive(Copy, Clone)]
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Recipe {
     /// 配方等级
     pub rlv: i32,
@@ -293,10 +344,10 @@ pub struct Recipe {
     pub difficulty: u16,
 
     /// 最高品质
-    pub quality: i32,
+    pub quality: u32,
 
     /// 耐久
-    pub durability: i32,
+    pub durability: u16,
 
     /// 制作状态标志位，用于表示本次制作有可能出现哪些球色。
     /// 该字段从低到高每个bit依次表示对应Condition中的状态是否会出现
@@ -323,10 +374,10 @@ pub struct Recipe {
     /// ```
     pub conditions_flag: u16,
 
-    progress_divider: u8,
-    quality_divider: u8,
-    progress_modifier: u8,
-    quality_modifier: u8,
+    pub progress_divider: u8,
+    pub quality_divider: u8,
+    pub progress_modifier: u8,
+    pub quality_modifier: u8,
 }
 
 impl Recipe {
@@ -341,8 +392,8 @@ impl Recipe {
             rlv,
             job_level: rt.class_job_level,
             difficulty: (rt.difficulty as u32 * difficulty_factor as u32 / 100) as u16,
-            quality: rt.quality as i32 * quality_factor as i32 / 100,
-            durability: rt.durability as i32 * durability_factor as i32 / 100,
+            quality: rt.quality * quality_factor as u32 / 100,
+            durability: rt.durability * durability_factor / 100,
             conditions_flag: rt.conditions_flag,
             progress_divider: rt.progress_divider,
             quality_divider: rt.quality_divider,
@@ -353,7 +404,8 @@ impl Recipe {
 }
 
 /// Buffs 储存了一次制作中玩家全部buff状态信息
-#[derive(Copy, Clone, Default)]
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Buffs {
     /// 坚信
     pub muscle_memory: u8,
@@ -373,22 +425,14 @@ pub struct Buffs {
     pub wast_not: u8,
     /// 中级加工预备
     /// 假想buff，用于处理 加工-中级加工 的连击。
-    pub standard_touch_prepared: bool,
+    pub standard_touch_prepared: u8,
     /// 上级加工预备
     /// 假想buff，用于处理 加工-中级加工-上级加工 的连击。
-    pub advanced_touch_prepared: bool,
+    pub advanced_touch_prepared: u8,
     /// 观察（注视预备）
     /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
-    pub observed: bool,
+    pub observed: u8,
 }
-
-/// StacksBuff 代表拥有层数的buff，且层数不会随着制作回合衰减，如内静。
-#[derive(Copy, Clone, Debug)]
-pub struct StacksBuff(pub usize);
-
-/// DurationBuff 代表拥有剩余时长的buff，该时长会随着制作回合而递减，例如改革、崇敬等等。
-#[derive(Copy, Clone, Debug)]
-pub struct DurationBuff(pub usize);
 
 fn round_down(v: f32, scale: f32) -> f32 {
     (v * scale).floor() / scale
@@ -430,25 +474,23 @@ impl Buffs {
         }
     }
 
-    pub(crate) fn next(&self) -> Self {
-        Self {
-            muscle_memory: self.muscle_memory.saturating_sub(1),
-            great_strides: self.great_strides.saturating_sub(1),
-            veneration: self.veneration.saturating_sub(1),
-            innovation: self.innovation.saturating_sub(1),
-            inner_quiet: self.inner_quiet,
-            final_appraisal: self.final_appraisal.saturating_sub(1),
-            manipulation: self.manipulation.saturating_sub(1),
-            wast_not: self.wast_not.saturating_sub(1),
-            standard_touch_prepared: false,
-            advanced_touch_prepared: false,
-            observed: false,
-        }
+    pub(crate) fn next(&mut self) {
+        self.muscle_memory = self.muscle_memory.saturating_sub(1);
+        self.great_strides = self.great_strides.saturating_sub(1);
+        self.veneration = self.veneration.saturating_sub(1);
+        self.innovation = self.innovation.saturating_sub(1);
+        self.final_appraisal = self.final_appraisal.saturating_sub(1);
+        self.manipulation = self.manipulation.saturating_sub(1);
+        self.wast_not = self.wast_not.saturating_sub(1);
+        self.standard_touch_prepared = self.standard_touch_prepared.saturating_sub(1);
+        self.advanced_touch_prepared = self.advanced_touch_prepared.saturating_sub(1);
+        self.observed = self.observed.saturating_sub(1);
     }
 }
 
 /// Status 储存一次制作模拟所需的全部状态信息
-#[derive(Copy, Clone)]
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
 pub struct Status {
     /// 玩家当前身上的buff
     pub buffs: Buffs,
@@ -456,15 +498,17 @@ pub struct Status {
     pub attributes: Attributes,
     /// 本次制作配方
     pub recipe: Recipe,
+    /// 预计算数据
+    caches: Caches,
 
     /// 剩余耐久
-    pub durability: i32,
+    pub durability: u16,
     /// 剩余制作力
     pub craft_points: i32,
     /// 进展
     pub progress: u16,
     /// 品质
-    pub quality: i32,
+    pub quality: u32,
 
     /// 步数
     pub step: i32,
@@ -472,7 +516,38 @@ pub struct Status {
     pub condition: Condition,
 }
 
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+struct Caches {
+    base_synth: f32,
+    base_touch: f32,
+}
+
+impl Caches {
+    fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
+        Self {
+            base_synth: {
+                let mut base =
+                    attributes.craftsmanship as f32 * 10.0 / recipe.progress_divider as f32 + 2.0;
+                if attributes.level_value() <= recipe.rlv {
+                    base *= recipe.progress_modifier as f32 * 0.01
+                }
+                base.floor()
+            },
+            base_touch: {
+                let mut base =
+                    attributes.control as f32 * 10.0 / recipe.quality_divider as f32 + 35.0;
+                if attributes.level_value() <= recipe.rlv {
+                    base *= recipe.quality_modifier as f32 * 0.01
+                }
+                base.floor()
+            },
+        }
+    }
+}
+
 /// 技能释放错误
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum CastActionError {
     /// 耐久不足
@@ -520,6 +595,7 @@ impl Status {
     pub fn new(attributes: Attributes, recipe: Recipe) -> Self {
         Status {
             buffs: Buffs::default(),
+            caches: Caches::new(&attributes, &recipe),
             attributes,
             recipe,
             durability: recipe.durability,
@@ -531,7 +607,7 @@ impl Status {
         }
     }
 
-    fn calc_durability(&self, durability: i32) -> i32 {
+    fn calc_durability(&self, durability: u16) -> u16 {
         let mut reduce = durability;
         if let Condition::Sturdy = self.condition {
             reduce -= reduce / 2;
@@ -542,8 +618,10 @@ impl Status {
         reduce
     }
 
-    fn consume_durability(&mut self, durability: i32) {
-        self.durability -= self.calc_durability(durability);
+    fn consume_durability(&mut self, durability: u16) {
+        self.durability = self
+            .durability
+            .saturating_sub(self.calc_durability(durability));
     }
 
     fn consume_craft_point(&mut self, cp: i32) {
@@ -555,49 +633,33 @@ impl Status {
     }
 
     pub fn calc_synthesis(&self, efficiency: f32) -> u16 {
-        let mut base =
-            self.attributes.craftsmanship as f32 * 10.0 / self.recipe.progress_divider as f32 + 2.0;
-        if self.attributes.level_value() <= self.recipe.rlv {
-            base *= self.recipe.progress_modifier as f32 * 0.01
-        }
-        (base.floor() * self.condition.synth_ratio() * self.buffs.synthesis(efficiency)) as u16
+        (self.caches.base_synth * self.condition.synth_ratio() * self.buffs.synthesis(efficiency))
+            as u16
     }
 
-    pub fn calc_touch(&self, efficiency: f32) -> i32 {
-        let mut base =
-            self.attributes.control as f32 * 10.0 / self.recipe.quality_divider as f32 + 35.0;
-        if self.attributes.level_value() <= self.recipe.rlv {
-            base *= self.recipe.quality_modifier as f32 * 0.01
-        }
-        (base.floor() * self.condition.touch_ratio() * self.buffs.touch(efficiency)) as i32
+    pub fn calc_touch(&self, efficiency: f32) -> u32 {
+        (self.caches.base_touch * self.condition.touch_ratio() * self.buffs.touch(efficiency))
+            as u32
     }
 
-    fn cast_synthesis(&mut self, next_buff: &mut Buffs, durability: i32, efficiency: f32) {
+    fn cast_synthesis(&mut self, durability: u16, efficiency: f32) {
         self.progress += self.calc_synthesis(efficiency);
         self.consume_durability(durability);
-        next_buff.apply_synthesis();
+        self.buffs.apply_synthesis();
         if self.progress >= self.recipe.difficulty {
-            self.progress = if next_buff.final_appraisal > 0 {
-                next_buff.final_appraisal = 0;
-                self.recipe.difficulty - 1
-            } else {
-                self.recipe.difficulty
+            self.progress = self.recipe.difficulty;
+            if self.buffs.final_appraisal > 0 {
+                self.progress -= 1
             }
         }
     }
 
-    fn cast_touch(
-        &mut self,
-        next_buff: &mut Buffs,
-        durability: i32,
-        efficiency: f32,
-        inner_quiet_addon: i8,
-    ) {
+    fn cast_touch(&mut self, durability: u16, efficiency: f32, inner_quiet_addon: i8) {
         let quality_addon = self.calc_touch(efficiency);
         self.quality = (self.quality + quality_addon).min(self.recipe.quality);
         self.consume_durability(durability);
-        next_buff.apply_touch();
-        next_buff.inner_quiet = self
+        self.buffs.apply_touch();
+        self.buffs.inner_quiet = self
             .buffs
             .inner_quiet
             .saturating_add_signed(inner_quiet_addon)
@@ -606,9 +668,9 @@ impl Status {
 
     pub fn new_duration_buff(&self, dt: u8) -> u8 {
         if let Condition::Primed = self.condition {
-            dt + 2
+            dt + 2 + 1
         } else {
-            dt
+            dt + 1
         }
     }
 
@@ -624,10 +686,10 @@ impl Status {
             Skills::WasteNot => 56,
             Skills::Veneration => 18,
             Skills::StandardTouch => {
-                if self.buffs.standard_touch_prepared {
-                    32
-                } else {
+                if self.buffs.standard_touch_prepared > 0 {
                     18
+                } else {
+                    32
                 }
             }
             Skills::GreatStrides => 32,
@@ -649,10 +711,10 @@ impl Status {
             Skills::IntensiveSynthesis => 6,
             Skills::TrainedEye => 250,
             Skills::AdvancedTouch => {
-                if self.buffs.advanced_touch_prepared {
-                    46
-                } else {
+                if self.buffs.advanced_touch_prepared > 0 {
                     18
+                } else {
+                    46
                 }
             }
             Skills::PrudentSynthesis => 18,
@@ -663,173 +725,152 @@ impl Status {
     }
 
     /// 发动一次技能。
-    pub fn cast_action(&self, action: Skills) -> Result<Self, CastActionError> {
-        self.is_action_allowed(action)?;
-        let mut next_state = *self;
-        let mut next_buffs = self.buffs.next();
-        next_state.consume_craft_point(self.craft_point(action));
+    pub fn cast_action(&mut self, action: Skills) {
+        self.consume_craft_point(self.craft_point(action));
         match action {
-            Skills::BasicSynthesis => next_state.cast_synthesis(
-                &mut next_buffs,
-                10,
-                if self.attributes.level < 31 { 1.0 } else { 1.2 },
-            ),
-            Skills::RapidSynthesis => next_state.cast_synthesis(
-                &mut next_buffs,
-                10,
-                if self.attributes.level < 63 { 2.5 } else { 5.0 },
-            ),
-            Skills::CarefulSynthesis => next_state.cast_synthesis(
-                &mut next_buffs,
-                10,
-                if self.attributes.level < 82 { 1.5 } else { 1.8 },
-            ),
-            Skills::FocusedSynthesis => next_state.cast_synthesis(&mut next_buffs, 10, 2.0),
+            Skills::BasicSynthesis => {
+                self.cast_synthesis(10, if self.attributes.level < 31 { 1.0 } else { 1.2 })
+            }
+            Skills::RapidSynthesis => {
+                self.cast_synthesis(10, if self.attributes.level < 63 { 2.5 } else { 5.0 })
+            }
+            Skills::CarefulSynthesis => {
+                self.cast_synthesis(10, if self.attributes.level < 82 { 1.5 } else { 1.8 })
+            }
+            Skills::FocusedSynthesis => self.cast_synthesis(10, 2.0),
             Skills::Groundwork => {
                 let mut e = if self.attributes.level < 86 { 3.0 } else { 3.6 };
                 let d = self.calc_durability(20);
                 if self.durability < d {
                     e *= 0.5
                 };
-                next_state.cast_synthesis(&mut next_buffs, 20, e)
+                self.cast_synthesis(20, e)
             }
-            Skills::IntensiveSynthesis => next_state.cast_synthesis(&mut next_buffs, 10, 4.0),
-            Skills::PrudentSynthesis => next_state.cast_synthesis(&mut next_buffs, 5, 1.8),
+            Skills::IntensiveSynthesis => self.cast_synthesis(10, 4.0),
+            Skills::PrudentSynthesis => self.cast_synthesis(5, 1.8),
 
             Skills::DelicateSynthesis => {
-                next_state.cast_synthesis(&mut next_buffs, 0, 1.0);
-                next_state.cast_touch(&mut next_buffs, 10, 1.0, 1);
+                self.cast_synthesis(0, 1.0);
+                self.cast_touch(10, 1.0, 1);
             }
 
             Skills::BasicTouch => {
-                next_state.cast_touch(&mut next_buffs, 10, 1.0, 1);
-                next_buffs.standard_touch_prepared = true;
+                self.cast_touch(10, 1.0, 1);
+                self.buffs.standard_touch_prepared = 2;
             }
-            Skills::HastyTouch => next_state.cast_touch(&mut next_buffs, 10, 1.0, 1),
+            Skills::HastyTouch => self.cast_touch(10, 1.0, 1),
             Skills::StandardTouch => {
-                if self.buffs.standard_touch_prepared {
-                    next_buffs.advanced_touch_prepared = true;
+                if self.buffs.standard_touch_prepared > 0 {
+                    self.buffs.advanced_touch_prepared = 2;
                 };
-                next_state.cast_touch(&mut next_buffs, 10, 1.25, 1)
+                self.cast_touch(10, 1.25, 1)
             }
-            Skills::AdvancedTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 1),
+            Skills::AdvancedTouch => self.cast_touch(10, 1.5, 1),
             Skills::ByregotsBlessing => {
-                let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).max(3.0);
-                next_state.cast_touch(&mut next_buffs, 10, e, -(self.buffs.inner_quiet as i8));
+                let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).min(3.0);
+                self.cast_touch(10, e, -(self.buffs.inner_quiet as i8));
             }
-            Skills::PreciseTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 2),
-            Skills::PrudentTouch => next_state.cast_touch(&mut next_buffs, 5, 1.0, 1),
-            Skills::FocusedTouch => next_state.cast_touch(&mut next_buffs, 10, 1.5, 1),
-            Skills::PreparatoryTouch => next_state.cast_touch(&mut next_buffs, 20, 2.0, 2),
-            Skills::TrainedFinesse => next_state.cast_touch(&mut next_buffs, 0, 1.0, 0),
+            Skills::PreciseTouch => self.cast_touch(10, 1.5, 2),
+            Skills::PrudentTouch => self.cast_touch(5, 1.0, 1),
+            Skills::FocusedTouch => self.cast_touch(10, 1.5, 1),
+            Skills::PreparatoryTouch => self.cast_touch(20, 2.0, 2),
+            Skills::TrainedFinesse => self.cast_touch(0, 1.0, 0),
 
             Skills::TricksOfTheTrade => {
-                next_state.craft_points =
-                    (self.craft_points + 20).min(self.attributes.craft_points);
+                self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
             }
 
             Skills::MastersMend => {
-                next_state.durability = self.recipe.durability.min(next_state.durability + 30);
+                self.durability = self.recipe.durability.min(self.durability + 30);
             }
             Skills::WasteNot => {
-                next_buffs.wast_not = self.new_duration_buff(4);
+                self.buffs.wast_not = self.new_duration_buff(4);
             }
             Skills::WasteNotII => {
-                next_buffs.wast_not = self.new_duration_buff(8);
+                self.buffs.wast_not = self.new_duration_buff(8);
             }
             Skills::Manipulation => {
-                next_buffs.manipulation = self.new_duration_buff(8);
-                next_state.buffs = next_buffs;
-                next_state.condition = Condition::Normal;
-                next_state.step += 1;
-                return Ok(next_state);
+                self.buffs.manipulation = self.new_duration_buff(8);
+                self.buffs.next();
+                self.step += 1;
+                return;
             }
             Skills::MuscleMemory => {
-                next_state.cast_synthesis(&mut next_buffs, 10, 3.0);
-                next_buffs.muscle_memory = self.new_duration_buff(5);
+                self.cast_synthesis(10, 3.0);
+                self.buffs.muscle_memory = self.new_duration_buff(5);
             }
             Skills::Reflect => {
-                next_state.cast_touch(&mut next_buffs, 10, 1.0, 2);
+                self.cast_touch(10, 1.0, 2);
             }
             Skills::TrainedEye => {
-                next_state.quality += self.recipe.quality;
+                self.quality += self.recipe.quality;
             }
             Skills::Veneration => {
-                next_buffs.veneration = self.new_duration_buff(4);
+                self.buffs.veneration = self.new_duration_buff(4);
             }
             Skills::GreatStrides => {
-                next_buffs.great_strides = self.new_duration_buff(3);
+                self.buffs.great_strides = self.new_duration_buff(3);
             }
             Skills::Innovation => {
-                next_buffs.innovation = self.new_duration_buff(4);
+                self.buffs.innovation = self.new_duration_buff(4);
             }
             Skills::Observe => {
-                next_buffs.observed = true;
+                self.buffs.observed = 2;
             }
             Skills::FinalAppraisal => {
-                next_buffs.final_appraisal = self.new_duration_buff(5);
-                next_state.buffs = next_buffs;
-                next_state.condition = Condition::Normal;
-                next_state.step += 1;
-                return Ok(next_state);
+                self.buffs.final_appraisal = 4;
+                return;
             }
             Skills::CarefulObservation => {
-                next_state.condition = Condition::Normal;
-                next_state.buffs = next_buffs;
-                return Ok(next_state);
+                self.buffs.next();
+                return;
             }
             Skills::HeartAndSoul => todo!(),
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
-            next_state.durability += 5;
-            next_state.durability = next_state.durability.min(self.recipe.durability);
+            self.durability += 5;
+            self.durability = self.durability.min(self.recipe.durability);
         }
-        next_state.buffs = next_buffs;
-        next_state.condition = Condition::Normal;
-        next_state.step += 1;
-        Ok(next_state)
+        self.buffs.next();
+        self.step += 1;
     }
 
     /// 发动一次技能，并且失败。
-    pub fn fail_action(&self, action: Skills) -> Result<Status, CastActionError> {
-        self.is_action_allowed(action)?;
-        let mut next_state = *self;
-        next_state.consume_craft_point(self.craft_point(action));
+    pub fn fail_action(&mut self, action: Skills) {
+        self.consume_craft_point(self.craft_point(action));
         match action {
-            Skills::HastyTouch => next_state.consume_durability(10),
-            Skills::RapidSynthesis => next_state.consume_durability(10),
-            Skills::FocusedSynthesis => next_state.consume_durability(10),
-            Skills::FocusedTouch => next_state.consume_durability(10),
+            Skills::HastyTouch => self.consume_durability(10),
+            Skills::RapidSynthesis => self.consume_durability(10),
+            Skills::FocusedSynthesis => self.consume_durability(10),
+            Skills::FocusedTouch => self.consume_durability(10),
             _ => panic!("action {:?} never fail", action),
         }
         if self.durability > 0 && self.buffs.manipulation > 0 {
-            next_state.durability += 5;
-            next_state.durability = next_state.durability.min(self.recipe.durability);
+            self.durability += 5;
+            self.durability = self.durability.min(self.recipe.durability);
         }
-        next_state.buffs = self.buffs.next();
-        next_state.condition = Condition::Normal;
-        next_state.step += 1;
-        Ok(next_state)
+        self.buffs.next();
+        self.step += 1;
     }
 
-    /// 计算当前状态下某技能的成功概率，返回结果介于[0_f32..=1_f32]之间。
-    pub fn success_rate(&self, action: Skills) -> f32 {
+    /// 计算当前状态下某技能的成功概率，返回结果介于[0..=100]之间。
+    pub fn success_rate(&self, action: Skills) -> u8 {
         let addon = match self.condition {
-            Condition::Centered => 0.25,
-            _ => 0.0,
+            Condition::Centered => 25,
+            _ => 0,
         };
         addon
             + match action {
-                Skills::HastyTouch => 0.6,
-                Skills::RapidSynthesis => 0.5,
+                Skills::HastyTouch => 60,
+                Skills::RapidSynthesis => 50,
                 Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                    if self.buffs.observed {
-                        1.0
+                    if self.buffs.observed > 0 {
+                        100
                     } else {
-                        0.5
+                        50
                     }
                 }
-                _ => return 1.0,
+                _ => return 100,
             }
     }
 
@@ -859,13 +900,15 @@ impl Status {
                 Err(RequireGoodOrExcellent)
             }
 
-            Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => Err(NotAllowedInWastNotBuff),
+            Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => {
+                Err(NotAllowedInWastNotBuff)
+            }
 
             Skills::MuscleMemory | Skills::Reflect | Skills::TrainedEye if self.step != 0 => {
                 Err(OnlyAllowedInFirstStep)
             }
 
-            Skills::TrainedEye if self.attributes.level - self.recipe.job_level < 10 => {
+            Skills::TrainedEye if self.attributes.level < 10 + self.recipe.job_level => {
                 Err(LevelGapMustGreaterThanTen)
             }
 
@@ -978,9 +1021,9 @@ impl Iterator for ConditionIterator {
 
 #[cfg(test)]
 mod tests {
-    use crate::{data, Condition};
+    use test::Bencher;
 
-    use super::{Attributes, Recipe, Skills, Status};
+    use crate::{data, Attributes, Condition, Recipe, Skills, Status};
 
     #[test]
     fn basic_synth() {
@@ -995,7 +1038,7 @@ mod tests {
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
-            s = s.cast_action(Skills::BasicSynthesis).unwrap();
+            s.cast_action(Skills::BasicSynthesis);
             assert_eq!(s.progress, pg);
         }
     }
@@ -1079,7 +1122,7 @@ mod tests {
         .iter()
         .enumerate()
         {
-            s = s.cast_action(step.a).unwrap();
+            s.cast_action(step.a);
             assert_eq!(
                 s.progress, step.pg,
                 "step [{}] progress simulation fail: want {}, get {}",
@@ -1281,7 +1324,7 @@ mod tests {
             },
         ] {
             let skill = data::action_table(step.a).unwrap();
-            s = s.cast_action(skill).unwrap();
+            s.cast_action(skill);
             // println!("casting: {:?}", skill);
             assert_eq!(
                 s.progress, step.pg,
@@ -1322,55 +1365,349 @@ mod tests {
             su: bool,
         }
         for step in [
-            Step { a: 100390, pg: 0, qu: 247, du: 50, co: 9, su: true },
-            Step { a: 19300, pg: 0, qu: 247, du: 50, co: 1, su: true },
-            Step { a: 100366, pg: 0, qu: 247, du: 40, co: 2, su: false },
-            Step { a: 100318, pg: 1206, qu: 247, du: 30, co: 6, su: true },
-            Step { a: 100366, pg: 1206, qu: 247, du: 25, co: 7, su: false },
-            Step { a: 4577, pg: 1206, qu: 247, du: 25, co: 5, su: true },
-            Step { a: 100366, pg: 2713, qu: 247, du: 20, co: 6, su: true },
-            Step { a: 100366, pg: 2713, qu: 247, du: 20, co: 2, su: false },
-            Step { a: 100131, pg: 2713, qu: 913, du: 15, co: 5, su: true },
-            Step { a: 100358, pg: 2713, qu: 913, du: 10, co: 6, su: false },
-            Step { a: 100358, pg: 2713, qu: 1258, du: 10, co: 6, su: true },
-            Step { a: 100358, pg: 2713, qu: 1628, du: 10, co: 1, su: true },
-            Step { a: 100082, pg: 2713, qu: 1628, du: 15, co: 1, su: true },
-            Step { a: 100246, pg: 2713, qu: 2220, du: 10, co: 2, su: true },
-            Step { a: 100374, pg: 2713, qu: 2220, du: 10, co: 8, su: true },
-            Step { a: 100077, pg: 2713, qu: 2220, du: 40, co: 6, su: true },
-            Step { a: 100366, pg: 3718, qu: 2220, du: 35, co: 2, su: true },
-            Step { a: 100131, pg: 3718, qu: 3164, du: 25, co: 2, su: true },
-            Step { a: 100131, pg: 3718, qu: 4219, du: 15, co: 7, su: true },
-            Step { a: 100077, pg: 3718, qu: 4219, du: 45, co: 1, su: true },
-            Step { a: 100366, pg: 3718, qu: 4219, du: 35, co: 1, su: false },
-            Step { a: 100366, pg: 4723, qu: 4219, du: 25, co: 2, su: true },
-            Step { a: 100374, pg: 4723, qu: 4219, du: 25, co: 6, su: true },
-            Step { a: 100358, pg: 4723, qu: 4219, du: 20, co: 1, su: false },
-            Step { a: 19007, pg: 4723, qu: 4219, du: 20, co: 6, su: true },
-            Step { a: 100082, pg: 4723, qu: 4219, du: 20, co: 7, su: true },
-            Step { a: 100246, pg: 4723, qu: 5330, du: 10, co: 9, su: true },
-            Step { a: 100077, pg: 4723, qu: 5330, du: 40, co: 5, su: true },
-            Step { a: 100082, pg: 4723, qu: 5330, du: 40, co: 6, su: true },
-            Step { a: 100246, pg: 4723, qu: 6071, du: 35, co: 8, su: true },
-            Step { a: 100075, pg: 5084, qu: 6071, du: 25, co: 8, su: true },
-            Step { a: 100075, pg: 5445, qu: 6071, du: 15, co: 2, su: true },
-            Step { a: 100374, pg: 5445, qu: 6071, du: 15, co: 2, su: true },
-            Step { a: 100374, pg: 5445, qu: 6071, du: 15, co: 9, su: true },
-            Step { a: 263, pg: 5445, qu: 6071, du: 15, co: 9, su: true },
-            Step { a: 19007, pg: 5445, qu: 6071, du: 15, co: 5, su: true },
-            Step { a: 100082, pg: 5445, qu: 6071, du: 15, co: 1, su: true },
-            Step { a: 100246, pg: 5445, qu: 7923, du: 5, co: 8, su: true },
-            Step { a: 100077, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
-            Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
-            Step { a: 100082, pg: 5445, qu: 7923, du: 35, co: 1, su: true },
-            Step { a: 100075, pg: 5470, qu: 7923, du: 25, co: 1, su: true },
+            Step {
+                a: 100390,
+                pg: 0,
+                qu: 247,
+                du: 50,
+                co: 9,
+                su: true,
+            },
+            Step {
+                a: 19300,
+                pg: 0,
+                qu: 247,
+                du: 50,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 0,
+                qu: 247,
+                du: 40,
+                co: 2,
+                su: false,
+            },
+            Step {
+                a: 100318,
+                pg: 1206,
+                qu: 247,
+                du: 30,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 1206,
+                qu: 247,
+                du: 25,
+                co: 7,
+                su: false,
+            },
+            Step {
+                a: 4577,
+                pg: 1206,
+                qu: 247,
+                du: 25,
+                co: 5,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 2713,
+                qu: 247,
+                du: 20,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 2713,
+                qu: 247,
+                du: 20,
+                co: 2,
+                su: false,
+            },
+            Step {
+                a: 100131,
+                pg: 2713,
+                qu: 913,
+                du: 15,
+                co: 5,
+                su: true,
+            },
+            Step {
+                a: 100358,
+                pg: 2713,
+                qu: 913,
+                du: 10,
+                co: 6,
+                su: false,
+            },
+            Step {
+                a: 100358,
+                pg: 2713,
+                qu: 1258,
+                du: 10,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100358,
+                pg: 2713,
+                qu: 1628,
+                du: 10,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 2713,
+                qu: 1628,
+                du: 15,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100246,
+                pg: 2713,
+                qu: 2220,
+                du: 10,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100374,
+                pg: 2713,
+                qu: 2220,
+                du: 10,
+                co: 8,
+                su: true,
+            },
+            Step {
+                a: 100077,
+                pg: 2713,
+                qu: 2220,
+                du: 40,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 3718,
+                qu: 2220,
+                du: 35,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100131,
+                pg: 3718,
+                qu: 3164,
+                du: 25,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100131,
+                pg: 3718,
+                qu: 4219,
+                du: 15,
+                co: 7,
+                su: true,
+            },
+            Step {
+                a: 100077,
+                pg: 3718,
+                qu: 4219,
+                du: 45,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100366,
+                pg: 3718,
+                qu: 4219,
+                du: 35,
+                co: 1,
+                su: false,
+            },
+            Step {
+                a: 100366,
+                pg: 4723,
+                qu: 4219,
+                du: 25,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100374,
+                pg: 4723,
+                qu: 4219,
+                du: 25,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100358,
+                pg: 4723,
+                qu: 4219,
+                du: 20,
+                co: 1,
+                su: false,
+            },
+            Step {
+                a: 19007,
+                pg: 4723,
+                qu: 4219,
+                du: 20,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 4723,
+                qu: 4219,
+                du: 20,
+                co: 7,
+                su: true,
+            },
+            Step {
+                a: 100246,
+                pg: 4723,
+                qu: 5330,
+                du: 10,
+                co: 9,
+                su: true,
+            },
+            Step {
+                a: 100077,
+                pg: 4723,
+                qu: 5330,
+                du: 40,
+                co: 5,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 4723,
+                qu: 5330,
+                du: 40,
+                co: 6,
+                su: true,
+            },
+            Step {
+                a: 100246,
+                pg: 4723,
+                qu: 6071,
+                du: 35,
+                co: 8,
+                su: true,
+            },
+            Step {
+                a: 100075,
+                pg: 5084,
+                qu: 6071,
+                du: 25,
+                co: 8,
+                su: true,
+            },
+            Step {
+                a: 100075,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100374,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 2,
+                su: true,
+            },
+            Step {
+                a: 100374,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 9,
+                su: true,
+            },
+            Step {
+                a: 263,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 9,
+                su: true,
+            },
+            Step {
+                a: 19007,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 5,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 5445,
+                qu: 6071,
+                du: 15,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100246,
+                pg: 5445,
+                qu: 7923,
+                du: 5,
+                co: 8,
+                su: true,
+            },
+            Step {
+                a: 100077,
+                pg: 5445,
+                qu: 7923,
+                du: 35,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 5445,
+                qu: 7923,
+                du: 35,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100082,
+                pg: 5445,
+                qu: 7923,
+                du: 35,
+                co: 1,
+                su: true,
+            },
+            Step {
+                a: 100075,
+                pg: 5470,
+                qu: 7923,
+                du: 25,
+                co: 1,
+                su: true,
+            },
         ] {
             let skill = data::action_table(step.a).unwrap();
             // println!("casting: {:?} {}", skill,  s.craft_points);
             if step.su {
-                s = s.cast_action(skill).unwrap();
+                s.cast_action(skill);
             } else {
-                s = s.fail_action(skill).unwrap();
+                s.fail_action(skill);
             }
             assert_eq!(
                 s.progress, step.pg,
@@ -1404,5 +1741,49 @@ mod tests {
             9 => Condition::Primed,
             _ => unreachable!(),
         }
+    }
+
+    #[allow(unused_must_use)]
+    #[bench]
+    fn simple_benchmark(b: &mut Bencher) {
+        let recipe = Recipe::new(580, 100, 140, 100);
+        let player = Attributes {
+            level: 90,
+            craftsmanship: 3293,
+            control: 3524,
+            craft_points: 626,
+        };
+        let s = Status::new(player, recipe);
+        let actions = [
+            Skills::MuscleMemory,
+            Skills::Manipulation,
+            Skills::Veneration,
+            Skills::WasteNotII,
+            Skills::Groundwork,
+            Skills::Groundwork,
+            Skills::BasicTouch,
+            Skills::Innovation,
+            Skills::PreparatoryTouch,
+            Skills::BasicTouch,
+            Skills::StandardTouch,
+            Skills::AdvancedTouch,
+            Skills::Innovation,
+            Skills::PrudentTouch,
+            Skills::BasicTouch,
+            Skills::StandardTouch,
+            Skills::AdvancedTouch,
+            Skills::Innovation,
+            Skills::TrainedFinesse,
+            Skills::TrainedFinesse,
+            Skills::GreatStrides,
+            Skills::ByregotsBlessing,
+            Skills::CarefulSynthesis,
+        ];
+        b.iter(|| {
+            let mut s = s.clone();
+            for sk in &actions {
+                s.cast_action(*sk);
+            }
+        })
     }
 }

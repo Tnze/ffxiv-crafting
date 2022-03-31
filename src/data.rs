@@ -870,7 +870,7 @@ pub fn action_table(id: i32) -> Option<Skills> {
     })
 }
 
-pub fn high_quality_table(percent: i32) -> Option<i32> {
+pub fn high_quality_table(percent: u32) -> Option<i32> {
     match percent {
         0 => Some(1),
         5 => Some(2),
