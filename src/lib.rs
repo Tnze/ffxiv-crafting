@@ -14,11 +14,11 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
-mod data;
+pub mod data;
 pub mod export;
 
 /// 代表一个玩家在作业时可以使用的一个技能的枚举。
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Skills {
     BasicSynthesis,
@@ -373,11 +373,6 @@ pub struct Recipe {
     /// assert_eq!(belong(cond_flag, Condition::Primed), false);
     /// ```
     pub conditions_flag: u16,
-
-    pub progress_divider: u8,
-    pub quality_divider: u8,
-    pub progress_modifier: u8,
-    pub quality_modifier: u8,
 }
 
 impl Recipe {
@@ -395,10 +390,6 @@ impl Recipe {
             quality: rt.quality * quality_factor as u32 / 100,
             durability: rt.durability * durability_factor / 100,
             conditions_flag: rt.conditions_flag,
-            progress_divider: rt.progress_divider,
-            quality_divider: rt.quality_divider,
-            progress_modifier: rt.progress_modifier,
-            quality_modifier: rt.quality_modifier,
         }
     }
 }
@@ -525,20 +516,21 @@ struct Caches {
 
 impl Caches {
     fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
+        let rt = data::recipe_level_table(recipe.rlv);
         Self {
             base_synth: {
                 let mut base =
-                    attributes.craftsmanship as f32 * 10.0 / recipe.progress_divider as f32 + 2.0;
+                    attributes.craftsmanship as f32 * 10.0 / rt.progress_divider as f32 + 2.0;
                 if attributes.level_value() <= recipe.rlv {
-                    base *= recipe.progress_modifier as f32 * 0.01
+                    base *= rt.progress_modifier as f32 * 0.01
                 }
                 base.floor()
             },
             base_touch: {
                 let mut base =
-                    attributes.control as f32 * 10.0 / recipe.quality_divider as f32 + 35.0;
+                    attributes.control as f32 * 10.0 / rt.quality_divider as f32 + 35.0;
                 if attributes.level_value() <= recipe.rlv {
-                    base *= recipe.quality_modifier as f32 * 0.01
+                    base *= rt.quality_modifier as f32 * 0.01
                 }
                 base.floor()
             },
