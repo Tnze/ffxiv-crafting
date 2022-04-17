@@ -912,7 +912,7 @@ impl Status {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent) || self.buffs.heart_and_soul > 0 =>
+            if !matches!(self.condition, Condition::Good | Condition::Excellent) && self.buffs.heart_and_soul == 0 =>
                 {
                     Err(RequireGoodOrExcellent)
                 }
