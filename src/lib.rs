@@ -59,8 +59,8 @@ pub enum Skills {
 #[cfg(feature = "serde-support")]
 impl Serialize for Skills {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         serializer.serialize_str(self.into())
     }
@@ -69,8 +69,8 @@ impl Serialize for Skills {
 #[cfg(feature = "serde-support")]
 impl<'de> Deserialize<'de> for Skills {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         struct StrVisitor;
         impl<'de> Visitor<'de> for StrVisitor {
@@ -81,8 +81,8 @@ impl<'de> Deserialize<'de> for Skills {
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
+                where
+                    E: de::Error,
             {
                 Skills::try_from(v).map_err(de::Error::custom)
             }
@@ -414,6 +414,11 @@ pub struct Buffs {
     pub manipulation: u8,
     /// 俭约 OR 长期俭约
     pub wast_not: u8,
+    /// 专心致志
+    pub heart_and_soul: u8,
+    /// 禁止使用专心致志
+    /// 假想buff，用于禁止使用专心致志
+    pub not_heart_and_soul: u8,
     /// 中级加工预备
     /// 假想buff，用于处理 加工-中级加工 的连击。
     pub standard_touch_prepared: u8,
@@ -562,6 +567,8 @@ pub enum CastActionError {
     RequireInnerQuiet1,
     /// 该技能只有在内静的档数为10时才可以使用
     RequireInnerQuiet10,
+    /// 专心致志一次制作只能使用一次
+    HeartAndSoulUsed,
 }
 
 impl Display for CastActionError {
@@ -577,6 +584,7 @@ impl Display for CastActionError {
             CastActionError::LevelGapMustGreaterThanTen => "level gap must greater than 10",
             CastActionError::RequireInnerQuiet1 => "require at least 1 stack of inner quiet",
             CastActionError::RequireInnerQuiet10 => "require 10 stack of inner quiet",
+            CastActionError::HeartAndSoulUsed => "heart and soul can be only used once"
         })
     }
 }
@@ -738,7 +746,10 @@ impl Status {
                 };
                 self.cast_synthesis(20, e)
             }
-            Skills::IntensiveSynthesis => self.cast_synthesis(10, 4.0),
+            Skills::IntensiveSynthesis => {
+                self.cast_synthesis(10, 4.0);
+                self.buffs.heart_and_soul = 0;
+            }
             Skills::PrudentSynthesis => self.cast_synthesis(5, 1.8),
 
             Skills::DelicateSynthesis => {
@@ -762,7 +773,10 @@ impl Status {
                 let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).min(3.0);
                 self.cast_touch(10, e, -(self.buffs.inner_quiet as i8));
             }
-            Skills::PreciseTouch => self.cast_touch(10, 1.5, 2),
+            Skills::PreciseTouch => {
+                self.cast_touch(10, 1.5, 2);
+                self.buffs.heart_and_soul = 0;
+            }
             Skills::PrudentTouch => self.cast_touch(5, 1.0, 1),
             Skills::FocusedTouch => self.cast_touch(10, 1.5, 1),
             Skills::PreparatoryTouch => self.cast_touch(20, 2.0, 2),
@@ -770,6 +784,7 @@ impl Status {
 
             Skills::TricksOfTheTrade => {
                 self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
+                self.buffs.heart_and_soul = 0;
             }
 
             Skills::MastersMend => {
@@ -817,7 +832,10 @@ impl Status {
                 self.buffs.next();
                 return;
             }
-            Skills::HeartAndSoul => todo!(),
+            Skills::HeartAndSoul => {
+                self.buffs.heart_and_soul = 1;
+                self.buffs.not_heart_and_soul = 1;
+            }
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
             self.durability += 5;
@@ -853,17 +871,17 @@ impl Status {
         };
         addon
             + match action {
-                Skills::HastyTouch => 60,
-                Skills::RapidSynthesis => 50,
-                Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                    if self.buffs.observed > 0 {
-                        100
-                    } else {
-                        50
-                    }
+            Skills::HastyTouch => 60,
+            Skills::RapidSynthesis => 50,
+            Skills::FocusedSynthesis | Skills::FocusedTouch => {
+                if self.buffs.observed > 0 {
+                    100
+                } else {
+                    50
                 }
-                _ => return 100,
             }
+            _ => return 100,
+        }
     }
 
     /// 当前状态是否允许发动某技能。
@@ -871,7 +889,7 @@ impl Status {
         use CastActionError::{
             CraftPointNotEnough, CraftingAlreadyFinished, DurabilityNotEnough,
             LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
-            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
+            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10, HeartAndSoulUsed,
         };
 
         let cp = {
@@ -887,10 +905,10 @@ impl Status {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-                if !matches!(self.condition, Condition::Good | Condition::Excellent) =>
-            {
-                Err(RequireGoodOrExcellent)
-            }
+            if !matches!(self.condition, Condition::Good | Condition::Excellent) || self.buffs.heart_and_soul > 0 =>
+                {
+                    Err(RequireGoodOrExcellent)
+                }
 
             Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => {
                 Err(NotAllowedInWastNotBuff)
@@ -906,6 +924,8 @@ impl Status {
 
             Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
             Skills::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
+
+            Skills::HeartAndSoul if self.buffs.not_heart_and_soul > 0 => Err(HeartAndSoulUsed),
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
             _ if cp > self.craft_points => Err(CraftPointNotEnough),
@@ -1015,7 +1035,7 @@ impl Iterator for ConditionIterator {
 mod tests {
     use test::Bencher;
 
-    use crate::{data, Attributes, Condition, Recipe, Skills, Status};
+    use crate::{Attributes, Condition, data, Recipe, Skills, Status};
 
     #[test]
     fn basic_synth() {
@@ -1111,8 +1131,8 @@ mod tests {
                 co: 1,
             },
         ]
-        .iter()
-        .enumerate()
+            .iter()
+            .enumerate()
         {
             s.cast_action(step.a);
             assert_eq!(
