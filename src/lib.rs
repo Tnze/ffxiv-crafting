@@ -416,9 +416,12 @@ pub struct Buffs {
     pub wast_not: u8,
     /// 专心致志
     pub heart_and_soul: u8,
+    /// 设计变动使用次数
+    /// 假想buff，用于记录设计变动使用的次数
+    pub careful_observation_used: u8,
     /// 禁止使用专心致志
     /// 假想buff，用于禁止使用专心致志
-    pub not_heart_and_soul: u8,
+    pub heart_and_soul_used: u8,
     /// 中级加工预备
     /// 假想buff，用于处理 加工-中级加工 的连击。
     pub standard_touch_prepared: u8,
@@ -567,6 +570,8 @@ pub enum CastActionError {
     RequireInnerQuiet1,
     /// 该技能只有在内静的档数为10时才可以使用
     RequireInnerQuiet10,
+    /// 设计变动最多使用三次
+    CarefulObservationUsed3,
     /// 专心致志一次制作只能使用一次
     HeartAndSoulUsed,
 }
@@ -584,6 +589,7 @@ impl Display for CastActionError {
             CastActionError::LevelGapMustGreaterThanTen => "level gap must greater than 10",
             CastActionError::RequireInnerQuiet1 => "require at least 1 stack of inner quiet",
             CastActionError::RequireInnerQuiet10 => "require 10 stack of inner quiet",
+            CastActionError::CarefulObservationUsed3 => "careful observation can only use 3 times",
             CastActionError::HeartAndSoulUsed => "heart and soul can be only used once"
         })
     }
@@ -825,16 +831,16 @@ impl Status {
                 self.buffs.observed = 2;
             }
             Skills::FinalAppraisal => {
-                self.buffs.final_appraisal = 4;
+                self.buffs.final_appraisal = 5;
                 return;
             }
             Skills::CarefulObservation => {
-                self.buffs.next();
+                self.buffs.careful_observation_used += 1;
                 return;
             }
             Skills::HeartAndSoul => {
                 self.buffs.heart_and_soul = 1;
-                self.buffs.not_heart_and_soul = 1;
+                self.buffs.heart_and_soul_used += 1;
             }
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
@@ -889,7 +895,8 @@ impl Status {
         use CastActionError::{
             CraftPointNotEnough, CraftingAlreadyFinished, DurabilityNotEnough,
             LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
-            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10, HeartAndSoulUsed,
+            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
+            CarefulObservationUsed3, HeartAndSoulUsed,
         };
 
         let cp = {
@@ -925,7 +932,8 @@ impl Status {
             Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
             Skills::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
 
-            Skills::HeartAndSoul if self.buffs.not_heart_and_soul > 0 => Err(HeartAndSoulUsed),
+            Skills::CarefulObservation if self.buffs.careful_observation_used >= 3 => Err(CarefulObservationUsed3),
+            Skills::HeartAndSoul if self.buffs.heart_and_soul_used >= 1 => Err(HeartAndSoulUsed),
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
             _ if cp > self.craft_points => Err(CraftPointNotEnough),
