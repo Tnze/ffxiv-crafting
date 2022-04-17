@@ -841,6 +841,7 @@ impl Status {
             Skills::HeartAndSoul => {
                 self.buffs.heart_and_soul = 1;
                 self.buffs.heart_and_soul_used += 1;
+                return;
             }
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
