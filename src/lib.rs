@@ -650,7 +650,8 @@ impl Status {
         if self.progress >= self.recipe.difficulty {
             self.progress = self.recipe.difficulty;
             if self.buffs.final_appraisal > 0 {
-                self.progress -= 1
+                self.progress -= 1;
+                self.buffs.final_appraisal = 0;
             }
         }
     }
