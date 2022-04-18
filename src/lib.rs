@@ -422,12 +422,8 @@ pub struct Buffs {
     /// 禁止使用专心致志
     /// 假想buff，用于禁止使用专心致志
     pub heart_and_soul_used: u8,
-    /// 中级加工预备
-    /// 假想buff，用于处理 加工-中级加工 的连击。
-    pub standard_touch_prepared: u8,
-    /// 上级加工预备
-    /// 假想buff，用于处理 加工-中级加工-上级加工 的连击。
-    pub advanced_touch_prepared: u8,
+    /// 加工连击状态：0无，1中级加工预备，2上级加工预备
+    pub touch_combo_stage: u8,
     /// 观察（注视预备）
     /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
     pub observed: u8,
@@ -481,8 +477,7 @@ impl Buffs {
         self.final_appraisal = self.final_appraisal.saturating_sub(1);
         self.manipulation = self.manipulation.saturating_sub(1);
         self.wast_not = self.wast_not.saturating_sub(1);
-        self.standard_touch_prepared = self.standard_touch_prepared.saturating_sub(1);
-        self.advanced_touch_prepared = self.advanced_touch_prepared.saturating_sub(1);
+        self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
         self.observed = self.observed.saturating_sub(1);
     }
 }
@@ -692,7 +687,7 @@ impl Status {
             Skills::WasteNot => 56,
             Skills::Veneration => 18,
             Skills::StandardTouch => {
-                if self.buffs.standard_touch_prepared > 0 {
+                if self.buffs.touch_combo_stage == 1 {
                     18
                 } else {
                     32
@@ -717,7 +712,7 @@ impl Status {
             Skills::IntensiveSynthesis => 6,
             Skills::TrainedEye => 250,
             Skills::AdvancedTouch => {
-                if self.buffs.advanced_touch_prepared > 0 {
+                if self.buffs.touch_combo_stage == 2 {
                     18
                 } else {
                     46
@@ -765,12 +760,12 @@ impl Status {
 
             Skills::BasicTouch => {
                 self.cast_touch(10, 1.0, 1);
-                self.buffs.standard_touch_prepared = 2;
+                self.buffs.touch_combo_stage = 1 + 2;
             }
             Skills::HastyTouch => self.cast_touch(10, 1.0, 1),
             Skills::StandardTouch => {
-                if self.buffs.standard_touch_prepared > 0 {
-                    self.buffs.advanced_touch_prepared = 2;
+                if self.buffs.touch_combo_stage == 1 {
+                    self.buffs.touch_combo_stage = 2 + 2;
                 };
                 self.cast_touch(10, 1.25, 1)
             }
@@ -1078,8 +1073,8 @@ mod tests {
         struct Step {
             a: Skills,
             pg: u16,
-            qu: i32,
-            du: i32,
+            qu: u32,
+            du: u16,
             co: u8,
         }
         for (i, step) in [
@@ -1177,8 +1172,8 @@ mod tests {
         struct Step {
             a: i32,
             pg: u16,
-            qu: i32,
-            du: i32,
+            qu: u32,
+            du: u16,
             co: u8,
         }
         for step in [
@@ -1380,8 +1375,8 @@ mod tests {
         struct Step {
             a: i32,
             pg: u16,
-            qu: i32,
-            du: i32,
+            qu: u32,
+            du: u16,
             co: u8,
             su: bool,
         }
