@@ -54,13 +54,18 @@ pub enum Skills {
     TrainedFinesse,
     CarefulObservation,
     HeartAndSoul,
+    // fake skills
+    RapidSynthesisFail,
+    HastyTouchFail,
+    FocusedSynthesisFail,
+    FocusedTouchFail,
 }
 
 #[cfg(feature = "serde-support")]
 impl Serialize for Skills {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(self.into())
     }
@@ -69,8 +74,8 @@ impl Serialize for Skills {
 #[cfg(feature = "serde-support")]
 impl<'de> Deserialize<'de> for Skills {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct StrVisitor;
         impl<'de> Visitor<'de> for StrVisitor {
@@ -81,8 +86,8 @@ impl<'de> Deserialize<'de> for Skills {
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
                 Skills::try_from(v).map_err(de::Error::custom)
             }
@@ -127,6 +132,11 @@ impl Skills {
             Skills::TrainedFinesse => 90,
             Skills::CarefulObservation => 55,
             Skills::HeartAndSoul => 86,
+            // fake skills
+            Skills::RapidSynthesisFail => 9,
+            Skills::HastyTouchFail => 9,
+            Skills::FocusedSynthesisFail => 67,
+            Skills::FocusedTouchFail => 68,
         }
     }
 }
@@ -167,6 +177,11 @@ impl From<&Skills> for &str {
             Skills::TrainedFinesse => "trained_finesse",
             Skills::CarefulObservation => "careful_observation",
             Skills::HeartAndSoul => "heart_and_soul",
+            // fake skills
+            Skills::RapidSynthesisFail => "rapid_synthsis_fail",
+            Skills::HastyTouchFail => "hasty_touch_fail",
+            Skills::FocusedSynthesisFail => "focused_synthesis_fail",
+            Skills::FocusedTouchFail => "focused_touch_fail",
         }
     }
 }
@@ -209,6 +224,11 @@ impl TryFrom<&str> for Skills {
             "trained_finesse" | "工匠的神技" => Skills::TrainedFinesse,
             "careful_observation" | "设计变动" => Skills::CarefulObservation,
             "heart_and_soul" | "专心致志" => Skills::HeartAndSoul,
+            // fake skills
+            "rapid_synthesis_fail" => Skills::RapidSynthesisFail,
+            "hasty_touch_fail" => Skills::HastyTouchFail,
+            "focused_synthesis_fail" => Skills::FocusedSynthesisFail,
+            "focused_touch_fail" => Skills::FocusedTouchFail,
             _ => return Err(UnknownSkillErr),
         })
     }
@@ -530,8 +550,7 @@ impl Caches {
                 base.floor()
             },
             base_touch: {
-                let mut base =
-                    attributes.control as f32 * 10.0 / rt.quality_divider as f32 + 35.0;
+                let mut base = attributes.control as f32 * 10.0 / rt.quality_divider as f32 + 35.0;
                 if attributes.level_value() <= recipe.rlv {
                     base *= rt.quality_modifier as f32 * 0.01
                 }
@@ -569,6 +588,8 @@ pub enum CastActionError {
     CarefulObservationUsed3,
     /// 专心致志一次制作只能使用一次
     HeartAndSoulUsed,
+    /// 注视在观察之后无法失败
+    FocusNeverFailsAfterObserved,
 }
 
 impl Display for CastActionError {
@@ -585,7 +606,8 @@ impl Display for CastActionError {
             CastActionError::RequireInnerQuiet1 => "require at least 1 stack of inner quiet",
             CastActionError::RequireInnerQuiet10 => "require 10 stack of inner quiet",
             CastActionError::CarefulObservationUsed3 => "careful observation can only use 3 times",
-            CastActionError::HeartAndSoulUsed => "heart and soul can be only used once"
+            CastActionError::HeartAndSoulUsed => "heart and soul can be only used once",
+            CastActionError::FocusNeverFailsAfterObserved => "focus never fails after observed",
         })
     }
 }
@@ -723,6 +745,11 @@ impl Status {
             Skills::TrainedFinesse => 32,
             Skills::CarefulObservation => 0,
             Skills::HeartAndSoul => 0,
+            // fake skills
+            Skills::RapidSynthesisFail => 0,
+            Skills::HastyTouchFail => 0,
+            Skills::FocusedSynthesisFail => 5,
+            Skills::FocusedTouchFail => 18,
         }
     }
 
@@ -839,26 +866,13 @@ impl Status {
                 self.buffs.heart_and_soul_used += 1;
                 return;
             }
+            // fake skills
+            Skills::RapidSynthesisFail => self.consume_durability(10),
+            Skills::HastyTouchFail => self.consume_durability(10),
+            Skills::FocusedSynthesisFail => self.consume_durability(10),
+            Skills::FocusedTouchFail => self.consume_durability(10),
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
-            self.durability += 5;
-            self.durability = self.durability.min(self.recipe.durability);
-        }
-        self.buffs.next();
-        self.step += 1;
-    }
-
-    /// 发动一次技能，并且失败。
-    pub fn fail_action(&mut self, action: Skills) {
-        self.consume_craft_point(self.craft_point(action));
-        match action {
-            Skills::HastyTouch => self.consume_durability(10),
-            Skills::RapidSynthesis => self.consume_durability(10),
-            Skills::FocusedSynthesis => self.consume_durability(10),
-            Skills::FocusedTouch => self.consume_durability(10),
-            _ => panic!("action {:?} never fail", action),
-        }
-        if self.durability > 0 && self.buffs.manipulation > 0 {
             self.durability += 5;
             self.durability = self.durability.min(self.recipe.durability);
         }
@@ -874,26 +888,26 @@ impl Status {
         };
         addon
             + match action {
-            Skills::HastyTouch => 60,
-            Skills::RapidSynthesis => 50,
-            Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                if self.buffs.observed > 0 {
-                    100
-                } else {
-                    50
+                Skills::HastyTouch => 60,
+                Skills::RapidSynthesis => 50,
+                Skills::FocusedSynthesis | Skills::FocusedTouch => {
+                    if self.buffs.observed > 0 {
+                        100
+                    } else {
+                        50
+                    }
                 }
+                _ => return 100,
             }
-            _ => return 100,
-        }
     }
 
     /// 当前状态是否允许发动某技能。
     pub fn is_action_allowed(&self, action: Skills) -> Result<(), CastActionError> {
         use CastActionError::{
-            CraftPointNotEnough, CraftingAlreadyFinished, DurabilityNotEnough,
+            CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
+            DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
             LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
             PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
-            CarefulObservationUsed3, HeartAndSoulUsed,
         };
 
         let cp = {
@@ -909,10 +923,11 @@ impl Status {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent) && self.buffs.heart_and_soul == 0 =>
-                {
-                    Err(RequireGoodOrExcellent)
-                }
+                if !matches!(self.condition, Condition::Good | Condition::Excellent)
+                    && self.buffs.heart_and_soul == 0 =>
+            {
+                Err(RequireGoodOrExcellent)
+            }
 
             Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => {
                 Err(NotAllowedInWastNotBuff)
@@ -929,8 +944,14 @@ impl Status {
             Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
             Skills::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
 
-            Skills::CarefulObservation if self.buffs.careful_observation_used >= 3 => Err(CarefulObservationUsed3),
+            Skills::CarefulObservation if self.buffs.careful_observation_used >= 3 => {
+                Err(CarefulObservationUsed3)
+            }
             Skills::HeartAndSoul if self.buffs.heart_and_soul_used >= 1 => Err(HeartAndSoulUsed),
+
+            Skills::FocusedSynthesisFail | Skills::FocusedTouchFail if self.buffs.observed > 0 => {
+                Err(FocusNeverFailsAfterObserved)
+            }
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
             _ if cp > self.craft_points => Err(CraftPointNotEnough),
@@ -1040,7 +1061,7 @@ impl Iterator for ConditionIterator {
 mod tests {
     use test::Bencher;
 
-    use crate::{Attributes, Condition, data, Recipe, Skills, Status};
+    use crate::{data, Attributes, Condition, Recipe, Skills, Status};
 
     #[test]
     fn basic_synth() {
@@ -1136,8 +1157,8 @@ mod tests {
                 co: 1,
             },
         ]
-            .iter()
-            .enumerate()
+        .iter()
+        .enumerate()
         {
             s.cast_action(step.a);
             assert_eq!(
@@ -1724,7 +1745,13 @@ mod tests {
             if step.su {
                 s.cast_action(skill);
             } else {
-                s.fail_action(skill);
+                s.cast_action(match skill {
+                    Skills::RapidSynthesis => Skills::RapidSynthesisFail,
+                    Skills::HastyTouch => Skills::HastyTouchFail,
+                    Skills::FocusedSynthesis => Skills::FocusedSynthesisFail,
+                    Skills::FocusedTouch => Skills::FocusedTouchFail,
+                    _ => unreachable!(),
+                })
             }
             assert_eq!(
                 s.progress, step.pg,
