@@ -647,14 +647,6 @@ impl Status {
             .saturating_sub(self.calc_durability(durability));
     }
 
-    fn consume_craft_point(&mut self, cp: i32) {
-        let mut reduce = cp;
-        if let Condition::Pliant = self.condition {
-            reduce -= reduce / 2;
-        }
-        self.craft_points -= reduce;
-    }
-
     pub fn calc_synthesis(&self, efficiency: f32) -> u16 {
         (self.caches.base_synth * self.condition.synth_ratio() * self.buffs.synthesis(efficiency))
             as u16
@@ -698,8 +690,10 @@ impl Status {
         }
     }
 
-    fn craft_point(&self, skill: Skills) -> i32 {
-        match skill {
+    /// 计算当前状态指定技能消耗的CP。
+    /// 考虑连击与球色
+    pub fn craft_point(&self, skill: Skills) -> i32 {
+        let cp = match skill {
             Skills::BasicSynthesis => 0,
             Skills::BasicTouch => 18,
             Skills::MastersMend => 88,
@@ -750,12 +744,17 @@ impl Status {
             Skills::HastyTouchFail => 0,
             Skills::FocusedSynthesisFail => 5,
             Skills::FocusedTouchFail => 18,
+        };
+        if let Condition::Pliant = self.condition {
+            cp - cp / 2
+        } else {
+            cp
         }
     }
 
     /// 发动一次技能。
     pub fn cast_action(&mut self, action: Skills) {
-        self.consume_craft_point(self.craft_point(action));
+        self.craft_points -= self.craft_point(action);
         match action {
             Skills::BasicSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 31 { 1.0 } else { 1.2 })
@@ -910,15 +909,6 @@ impl Status {
             PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
         };
 
-        let cp = {
-            let mut reduce = 0;
-            let cp = self.craft_point(action);
-            if let Condition::Pliant = self.condition {
-                reduce += cp / 2;
-            }
-            cp - reduce
-        };
-
         match action {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
@@ -954,7 +944,7 @@ impl Status {
             }
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
-            _ if cp > self.craft_points => Err(CraftPointNotEnough),
+            _ if self.craft_point(action) > self.craft_points => Err(CraftPointNotEnough),
             _ if self.progress >= self.recipe.difficulty => Err(CraftingAlreadyFinished),
             _ => Ok(()),
         }
