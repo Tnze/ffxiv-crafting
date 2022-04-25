@@ -64,8 +64,8 @@ pub enum Skills {
 #[cfg(feature = "serde-support")]
 impl Serialize for Skills {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         serializer.serialize_str(self.into())
     }
@@ -74,8 +74,8 @@ impl Serialize for Skills {
 #[cfg(feature = "serde-support")]
 impl<'de> Deserialize<'de> for Skills {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         struct StrVisitor;
         impl<'de> Visitor<'de> for StrVisitor {
@@ -86,8 +86,8 @@ impl<'de> Deserialize<'de> for Skills {
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
+                where
+                    E: de::Error,
             {
                 Skills::try_from(v).map_err(de::Error::custom)
             }
@@ -480,7 +480,7 @@ impl Buffs {
             bm += 0.5;
         }
         let iq = 1.0 + self.inner_quiet as f32 * 0.1;
-        skill_e * round_down(iq * bm, 100.0)
+        skill_e * bm * iq
     }
 
     pub(crate) fn apply_touch(&mut self) {
@@ -653,7 +653,7 @@ impl Status {
     }
 
     pub fn calc_touch(&self, efficiency: f32) -> u32 {
-        (self.caches.base_touch * self.condition.touch_ratio() * self.buffs.touch(efficiency))
+        (self.caches.base_touch * self.buffs.touch(efficiency) * self.condition.touch_ratio())
             as u32
     }
 
@@ -887,17 +887,17 @@ impl Status {
         };
         addon
             + match action {
-                Skills::HastyTouch => 60,
-                Skills::RapidSynthesis => 50,
-                Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                    if self.buffs.observed > 0 {
-                        100
-                    } else {
-                        50
-                    }
+            Skills::HastyTouch => 60,
+            Skills::RapidSynthesis => 50,
+            Skills::FocusedSynthesis | Skills::FocusedTouch => {
+                if self.buffs.observed > 0 {
+                    100
+                } else {
+                    50
                 }
-                _ => return 100,
             }
+            _ => return 100,
+        }
     }
 
     /// 当前状态是否允许发动某技能。
@@ -913,11 +913,11 @@ impl Status {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
             Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-                if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                    && self.buffs.heart_and_soul == 0 =>
-            {
-                Err(RequireGoodOrExcellent)
-            }
+            if !matches!(self.condition, Condition::Good | Condition::Excellent)
+                && self.buffs.heart_and_soul == 0 =>
+                {
+                    Err(RequireGoodOrExcellent)
+                }
 
             Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => {
                 Err(NotAllowedInWastNotBuff)
@@ -1051,7 +1051,7 @@ impl Iterator for ConditionIterator {
 mod tests {
     use test::Bencher;
 
-    use crate::{data, Attributes, Condition, Recipe, Skills, Status};
+    use crate::{Attributes, Condition, data, Recipe, Skills, Status};
 
     #[test]
     fn basic_synth() {
@@ -1147,8 +1147,8 @@ mod tests {
                 co: 1,
             },
         ]
-        .iter()
-        .enumerate()
+            .iter()
+            .enumerate()
         {
             s.cast_action(step.a);
             assert_eq!(
@@ -1819,5 +1819,43 @@ mod tests {
                 s.cast_action(*sk);
             }
         })
+    }
+
+    #[test]
+    fn test1() {
+        let recipe = Recipe {
+            rlv: 590,
+            job_level: 90,
+            difficulty: 4300,
+            quality: 12800,
+            durability: 70,
+            conditions_flag: 15,
+        };
+        let player = Attributes {
+            level: 90,
+            craftsmanship: 3258,
+            control: 3340,
+            craft_points: 654,
+        };
+        let mut s = Status::new(player, recipe);
+        let actions = vec![
+            Skills::MuscleMemory,
+            Skills::Manipulation,
+            Skills::Veneration,
+            Skills::WasteNot,
+            Skills::Groundwork,
+            Skills::Groundwork,
+            Skills::CarefulSynthesis,
+            Skills::BasicTouch,
+            Skills::StandardTouch,
+            Skills::AdvancedTouch,
+            Skills::Innovation,
+            Skills::PrudentTouch,
+            Skills::PrudentTouch,
+        ];
+        for &sk in &actions {
+            s.cast_action(sk);
+        }
+        assert_eq!(s.quality, 1865);
     }
 }
