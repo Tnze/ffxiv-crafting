@@ -20,7 +20,7 @@ pub mod export;
 /// 代表一个玩家在作业时可以使用的一个技能的枚举。
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Skills {
+pub enum Actions {
     BasicSynthesis,
     BasicTouch,
     MastersMend,
@@ -54,181 +54,184 @@ pub enum Skills {
     TrainedFinesse,
     CarefulObservation,
     HeartAndSoul,
-    // fake skills
+    // fake actions
     RapidSynthesisFail,
     HastyTouchFail,
     FocusedSynthesisFail,
     FocusedTouchFail,
 }
 
+#[deprecated]
+pub type Skills = Actions;
+
 #[cfg(feature = "serde-support")]
-impl Serialize for Skills {
+impl Serialize for Actions {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(self.into())
     }
 }
 
 #[cfg(feature = "serde-support")]
-impl<'de> Deserialize<'de> for Skills {
+impl<'de> Deserialize<'de> for Actions {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct StrVisitor;
         impl<'de> Visitor<'de> for StrVisitor {
-            type Value = Skills;
+            type Value = Actions;
 
             fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
                 formatter.write_str("a string")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
-                Skills::try_from(v).map_err(de::Error::custom)
+                Actions::try_from(v).map_err(de::Error::custom)
             }
         }
         deserializer.deserialize_str(StrVisitor)
     }
 }
 
-impl Skills {
+impl Actions {
     fn unlock_level(&self) -> u8 {
         match self {
-            Skills::BasicSynthesis => 1,
-            Skills::BasicTouch => 5,
-            Skills::MastersMend => 7,
-            Skills::HastyTouch => 9,
-            Skills::RapidSynthesis => 9,
-            Skills::Observe => 13,
-            Skills::TricksOfTheTrade => 13,
-            Skills::WasteNot => 15,
-            Skills::Veneration => 15,
-            Skills::StandardTouch => 18,
-            Skills::GreatStrides => 21,
-            Skills::Innovation => 26,
-            Skills::FinalAppraisal => 42,
-            Skills::WasteNotII => 47,
-            Skills::ByregotsBlessing => 50,
-            Skills::PreciseTouch => 53,
-            Skills::MuscleMemory => 54,
-            Skills::CarefulSynthesis => 62,
-            Skills::Manipulation => 65,
-            Skills::PrudentTouch => 66,
-            Skills::FocusedSynthesis => 67,
-            Skills::FocusedTouch => 68,
-            Skills::Reflect => 69,
-            Skills::PreparatoryTouch => 71,
-            Skills::Groundwork => 72,
-            Skills::DelicateSynthesis => 76,
-            Skills::IntensiveSynthesis => 78,
-            Skills::TrainedEye => 80,
-            Skills::AdvancedTouch => 84,
-            Skills::PrudentSynthesis => 88,
-            Skills::TrainedFinesse => 90,
-            Skills::CarefulObservation => 55,
-            Skills::HeartAndSoul => 86,
-            // fake skills
-            Skills::RapidSynthesisFail => 9,
-            Skills::HastyTouchFail => 9,
-            Skills::FocusedSynthesisFail => 67,
-            Skills::FocusedTouchFail => 68,
+            Actions::BasicSynthesis => 1,
+            Actions::BasicTouch => 5,
+            Actions::MastersMend => 7,
+            Actions::HastyTouch => 9,
+            Actions::RapidSynthesis => 9,
+            Actions::Observe => 13,
+            Actions::TricksOfTheTrade => 13,
+            Actions::WasteNot => 15,
+            Actions::Veneration => 15,
+            Actions::StandardTouch => 18,
+            Actions::GreatStrides => 21,
+            Actions::Innovation => 26,
+            Actions::FinalAppraisal => 42,
+            Actions::WasteNotII => 47,
+            Actions::ByregotsBlessing => 50,
+            Actions::PreciseTouch => 53,
+            Actions::MuscleMemory => 54,
+            Actions::CarefulSynthesis => 62,
+            Actions::Manipulation => 65,
+            Actions::PrudentTouch => 66,
+            Actions::FocusedSynthesis => 67,
+            Actions::FocusedTouch => 68,
+            Actions::Reflect => 69,
+            Actions::PreparatoryTouch => 71,
+            Actions::Groundwork => 72,
+            Actions::DelicateSynthesis => 76,
+            Actions::IntensiveSynthesis => 78,
+            Actions::TrainedEye => 80,
+            Actions::AdvancedTouch => 84,
+            Actions::PrudentSynthesis => 88,
+            Actions::TrainedFinesse => 90,
+            Actions::CarefulObservation => 55,
+            Actions::HeartAndSoul => 86,
+            // fake actions
+            Actions::RapidSynthesisFail => 9,
+            Actions::HastyTouchFail => 9,
+            Actions::FocusedSynthesisFail => 67,
+            Actions::FocusedTouchFail => 68,
         }
     }
 }
 
-impl From<&Skills> for &str {
-    fn from(sk: &Skills) -> Self {
+impl From<&Actions> for &str {
+    fn from(sk: &Actions) -> Self {
         match sk {
-            Skills::BasicSynthesis => "basic_synthesis",
-            Skills::BasicTouch => "basic_touch",
-            Skills::MastersMend => "masters_mend",
-            Skills::HastyTouch => "hasty_touch",
-            Skills::RapidSynthesis => "rapid_synthesis",
-            Skills::Observe => "observe",
-            Skills::TricksOfTheTrade => "tricks_of_the_trade",
-            Skills::WasteNot => "waste_not",
-            Skills::Veneration => "veneration",
-            Skills::StandardTouch => "standard_touch",
-            Skills::GreatStrides => "great_strides",
-            Skills::Innovation => "innovation",
-            Skills::FinalAppraisal => "final_appraisal",
-            Skills::WasteNotII => "waste_not_ii",
-            Skills::ByregotsBlessing => "byregot_s_blessing",
-            Skills::PreciseTouch => "precise_touch",
-            Skills::MuscleMemory => "muscle_memory",
-            Skills::CarefulSynthesis => "careful_synthesis",
-            Skills::Manipulation => "manipulation",
-            Skills::PrudentTouch => "prudent_touch",
-            Skills::FocusedSynthesis => "focused_synthesis",
-            Skills::FocusedTouch => "focused_touch",
-            Skills::Reflect => "reflect",
-            Skills::PreparatoryTouch => "preparatory_touch",
-            Skills::Groundwork => "groundwork",
-            Skills::DelicateSynthesis => "delicate_synthesis",
-            Skills::IntensiveSynthesis => "intensive_synthesis",
-            Skills::TrainedEye => "trained_eye",
-            Skills::AdvancedTouch => "advanced_touch",
-            Skills::PrudentSynthesis => "prudent_synthesis",
-            Skills::TrainedFinesse => "trained_finesse",
-            Skills::CarefulObservation => "careful_observation",
-            Skills::HeartAndSoul => "heart_and_soul",
-            // fake skills
-            Skills::RapidSynthesisFail => "rapid_synthsis_fail",
-            Skills::HastyTouchFail => "hasty_touch_fail",
-            Skills::FocusedSynthesisFail => "focused_synthesis_fail",
-            Skills::FocusedTouchFail => "focused_touch_fail",
+            Actions::BasicSynthesis => "basic_synthesis",
+            Actions::BasicTouch => "basic_touch",
+            Actions::MastersMend => "masters_mend",
+            Actions::HastyTouch => "hasty_touch",
+            Actions::RapidSynthesis => "rapid_synthesis",
+            Actions::Observe => "observe",
+            Actions::TricksOfTheTrade => "tricks_of_the_trade",
+            Actions::WasteNot => "waste_not",
+            Actions::Veneration => "veneration",
+            Actions::StandardTouch => "standard_touch",
+            Actions::GreatStrides => "great_strides",
+            Actions::Innovation => "innovation",
+            Actions::FinalAppraisal => "final_appraisal",
+            Actions::WasteNotII => "waste_not_ii",
+            Actions::ByregotsBlessing => "byregot_s_blessing",
+            Actions::PreciseTouch => "precise_touch",
+            Actions::MuscleMemory => "muscle_memory",
+            Actions::CarefulSynthesis => "careful_synthesis",
+            Actions::Manipulation => "manipulation",
+            Actions::PrudentTouch => "prudent_touch",
+            Actions::FocusedSynthesis => "focused_synthesis",
+            Actions::FocusedTouch => "focused_touch",
+            Actions::Reflect => "reflect",
+            Actions::PreparatoryTouch => "preparatory_touch",
+            Actions::Groundwork => "groundwork",
+            Actions::DelicateSynthesis => "delicate_synthesis",
+            Actions::IntensiveSynthesis => "intensive_synthesis",
+            Actions::TrainedEye => "trained_eye",
+            Actions::AdvancedTouch => "advanced_touch",
+            Actions::PrudentSynthesis => "prudent_synthesis",
+            Actions::TrainedFinesse => "trained_finesse",
+            Actions::CarefulObservation => "careful_observation",
+            Actions::HeartAndSoul => "heart_and_soul",
+            // fake actions
+            Actions::RapidSynthesisFail => "rapid_synthsis_fail",
+            Actions::HastyTouchFail => "hasty_touch_fail",
+            Actions::FocusedSynthesisFail => "focused_synthesis_fail",
+            Actions::FocusedTouchFail => "focused_touch_fail",
         }
     }
 }
 
-impl TryFrom<&str> for Skills {
+impl TryFrom<&str> for Actions {
     type Error = UnknownSkillErr;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
-            "basic_synthesis" | "制作" => Skills::BasicSynthesis,
-            "basic_touch" | "加工" => Skills::BasicTouch,
-            "masters_mend" | "精修" => Skills::MastersMend,
-            "hasty_touch" | "仓促" => Skills::HastyTouch,
-            "rapid_synthesis" | "高速制作" => Skills::RapidSynthesis,
-            "observe" | "观察" => Skills::Observe,
-            "tricks_of_the_trade" | "秘诀" => Skills::TricksOfTheTrade,
-            "waste_not" | "俭约" => Skills::WasteNot,
-            "veneration" | "崇敬" => Skills::Veneration,
-            "standard_touch" | "中级加工" => Skills::StandardTouch,
-            "great_strides" | "阔步" => Skills::GreatStrides,
-            "innovation" | "改革" => Skills::Innovation,
-            "final_appraisal" | "最终确认" => Skills::FinalAppraisal,
-            "waste_not_ii" | "长期俭约" => Skills::WasteNotII,
-            "byregot_s_blessing" | "比尔格的祝福" => Skills::ByregotsBlessing,
-            "precise_touch" | "集中加工" => Skills::PreciseTouch,
-            "muscle_memory" | "坚信" => Skills::MuscleMemory,
-            "careful_synthesis" | "模范制作" => Skills::CarefulSynthesis,
-            "manipulation" | "掌握" => Skills::Manipulation,
-            "prudent_touch" | "俭约加工" => Skills::PrudentTouch,
-            "focused_synthesis" | "注视制作" => Skills::FocusedSynthesis,
-            "focused_touch" | "注视加工" => Skills::FocusedTouch,
-            "reflect" | "闲静" => Skills::Reflect,
-            "preparatory_touch" | "坯料加工" => Skills::PreparatoryTouch,
-            "groundwork" | "坯料制作" => Skills::Groundwork,
-            "delicate_synthesis" | "精密制作" => Skills::DelicateSynthesis,
-            "intensive_synthesis" | "集中制作" => Skills::IntensiveSynthesis,
-            "trained_eye" | "工匠的神速技巧" => Skills::TrainedEye,
-            "advanced_touch" | "上级加工" => Skills::AdvancedTouch,
-            "prudent_synthesis" | "俭约制作" => Skills::PrudentSynthesis,
-            "trained_finesse" | "工匠的神技" => Skills::TrainedFinesse,
-            "careful_observation" | "设计变动" => Skills::CarefulObservation,
-            "heart_and_soul" | "专心致志" => Skills::HeartAndSoul,
-            // fake skills
-            "rapid_synthesis_fail" => Skills::RapidSynthesisFail,
-            "hasty_touch_fail" => Skills::HastyTouchFail,
-            "focused_synthesis_fail" => Skills::FocusedSynthesisFail,
-            "focused_touch_fail" => Skills::FocusedTouchFail,
+            "basic_synthesis" | "制作" => Actions::BasicSynthesis,
+            "basic_touch" | "加工" => Actions::BasicTouch,
+            "masters_mend" | "精修" => Actions::MastersMend,
+            "hasty_touch" | "仓促" => Actions::HastyTouch,
+            "rapid_synthesis" | "高速制作" => Actions::RapidSynthesis,
+            "observe" | "观察" => Actions::Observe,
+            "tricks_of_the_trade" | "秘诀" => Actions::TricksOfTheTrade,
+            "waste_not" | "俭约" => Actions::WasteNot,
+            "veneration" | "崇敬" => Actions::Veneration,
+            "standard_touch" | "中级加工" => Actions::StandardTouch,
+            "great_strides" | "阔步" => Actions::GreatStrides,
+            "innovation" | "改革" => Actions::Innovation,
+            "final_appraisal" | "最终确认" => Actions::FinalAppraisal,
+            "waste_not_ii" | "长期俭约" => Actions::WasteNotII,
+            "byregot_s_blessing" | "比尔格的祝福" => Actions::ByregotsBlessing,
+            "precise_touch" | "集中加工" => Actions::PreciseTouch,
+            "muscle_memory" | "坚信" => Actions::MuscleMemory,
+            "careful_synthesis" | "模范制作" => Actions::CarefulSynthesis,
+            "manipulation" | "掌握" => Actions::Manipulation,
+            "prudent_touch" | "俭约加工" => Actions::PrudentTouch,
+            "focused_synthesis" | "注视制作" => Actions::FocusedSynthesis,
+            "focused_touch" | "注视加工" => Actions::FocusedTouch,
+            "reflect" | "闲静" => Actions::Reflect,
+            "preparatory_touch" | "坯料加工" => Actions::PreparatoryTouch,
+            "groundwork" | "坯料制作" => Actions::Groundwork,
+            "delicate_synthesis" | "精密制作" => Actions::DelicateSynthesis,
+            "intensive_synthesis" | "集中制作" => Actions::IntensiveSynthesis,
+            "trained_eye" | "工匠的神速技巧" => Actions::TrainedEye,
+            "advanced_touch" | "上级加工" => Actions::AdvancedTouch,
+            "prudent_synthesis" | "俭约制作" => Actions::PrudentSynthesis,
+            "trained_finesse" | "工匠的神技" => Actions::TrainedFinesse,
+            "careful_observation" | "设计变动" => Actions::CarefulObservation,
+            "heart_and_soul" | "专心致志" => Actions::HeartAndSoul,
+            // fake actions
+            "rapid_synthesis_fail" => Actions::RapidSynthesisFail,
+            "hasty_touch_fail" => Actions::HastyTouchFail,
+            "focused_synthesis_fail" => Actions::FocusedSynthesisFail,
+            "focused_touch_fail" => Actions::FocusedTouchFail,
             _ => return Err(UnknownSkillErr),
         })
     }
@@ -692,58 +695,58 @@ impl Status {
 
     /// 计算当前状态指定技能消耗的CP。
     /// 考虑连击与球色
-    pub fn craft_point(&self, skill: Skills) -> i32 {
+    pub fn craft_point(&self, skill: Actions) -> i32 {
         let cp = match skill {
-            Skills::BasicSynthesis => 0,
-            Skills::BasicTouch => 18,
-            Skills::MastersMend => 88,
-            Skills::HastyTouch => 0,
-            Skills::RapidSynthesis => 0,
-            Skills::Observe => 7,
-            Skills::TricksOfTheTrade => 0,
-            Skills::WasteNot => 56,
-            Skills::Veneration => 18,
-            Skills::StandardTouch => {
+            Actions::BasicSynthesis => 0,
+            Actions::BasicTouch => 18,
+            Actions::MastersMend => 88,
+            Actions::HastyTouch => 0,
+            Actions::RapidSynthesis => 0,
+            Actions::Observe => 7,
+            Actions::TricksOfTheTrade => 0,
+            Actions::WasteNot => 56,
+            Actions::Veneration => 18,
+            Actions::StandardTouch => {
                 if self.buffs.touch_combo_stage == 1 {
                     18
                 } else {
                     32
                 }
             }
-            Skills::GreatStrides => 32,
-            Skills::Innovation => 18,
-            Skills::FinalAppraisal => 1,
-            Skills::WasteNotII => 98,
-            Skills::ByregotsBlessing => 24,
-            Skills::PreciseTouch => 18,
-            Skills::MuscleMemory => 6,
-            Skills::CarefulSynthesis => 7,
-            Skills::Manipulation => 96,
-            Skills::PrudentTouch => 25,
-            Skills::FocusedSynthesis => 5,
-            Skills::FocusedTouch => 18,
-            Skills::Reflect => 6,
-            Skills::PreparatoryTouch => 40,
-            Skills::Groundwork => 18,
-            Skills::DelicateSynthesis => 32,
-            Skills::IntensiveSynthesis => 6,
-            Skills::TrainedEye => 250,
-            Skills::AdvancedTouch => {
+            Actions::GreatStrides => 32,
+            Actions::Innovation => 18,
+            Actions::FinalAppraisal => 1,
+            Actions::WasteNotII => 98,
+            Actions::ByregotsBlessing => 24,
+            Actions::PreciseTouch => 18,
+            Actions::MuscleMemory => 6,
+            Actions::CarefulSynthesis => 7,
+            Actions::Manipulation => 96,
+            Actions::PrudentTouch => 25,
+            Actions::FocusedSynthesis => 5,
+            Actions::FocusedTouch => 18,
+            Actions::Reflect => 6,
+            Actions::PreparatoryTouch => 40,
+            Actions::Groundwork => 18,
+            Actions::DelicateSynthesis => 32,
+            Actions::IntensiveSynthesis => 6,
+            Actions::TrainedEye => 250,
+            Actions::AdvancedTouch => {
                 if self.buffs.touch_combo_stage == 2 {
                     18
                 } else {
                     46
                 }
             }
-            Skills::PrudentSynthesis => 18,
-            Skills::TrainedFinesse => 32,
-            Skills::CarefulObservation => 0,
-            Skills::HeartAndSoul => 0,
-            // fake skills
-            Skills::RapidSynthesisFail => 0,
-            Skills::HastyTouchFail => 0,
-            Skills::FocusedSynthesisFail => 5,
-            Skills::FocusedTouchFail => 18,
+            Actions::PrudentSynthesis => 18,
+            Actions::TrainedFinesse => 32,
+            Actions::CarefulObservation => 0,
+            Actions::HeartAndSoul => 0,
+            // fake actions
+            Actions::RapidSynthesisFail => 0,
+            Actions::HastyTouchFail => 0,
+            Actions::FocusedSynthesisFail => 5,
+            Actions::FocusedTouchFail => 18,
         };
         if let Condition::Pliant = self.condition {
             cp - cp / 2
@@ -753,20 +756,20 @@ impl Status {
     }
 
     /// 发动一次技能。
-    pub fn cast_action(&mut self, action: Skills) {
+    pub fn cast_action(&mut self, action: Actions) {
         self.craft_points -= self.craft_point(action);
         match action {
-            Skills::BasicSynthesis => {
+            Actions::BasicSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 31 { 1.0 } else { 1.2 })
             }
-            Skills::RapidSynthesis => {
+            Actions::RapidSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 63 { 2.5 } else { 5.0 })
             }
-            Skills::CarefulSynthesis => {
+            Actions::CarefulSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 82 { 1.5 } else { 1.8 })
             }
-            Skills::FocusedSynthesis => self.cast_synthesis(10, 2.0),
-            Skills::Groundwork => {
+            Actions::FocusedSynthesis => self.cast_synthesis(10, 2.0),
+            Actions::Groundwork => {
                 let mut e = if self.attributes.level < 86 { 3.0 } else { 3.6 };
                 let d = self.calc_durability(20);
                 if self.durability < d {
@@ -774,102 +777,102 @@ impl Status {
                 };
                 self.cast_synthesis(20, e)
             }
-            Skills::IntensiveSynthesis => {
+            Actions::IntensiveSynthesis => {
                 self.cast_synthesis(10, 4.0);
                 self.buffs.heart_and_soul = 0;
             }
-            Skills::PrudentSynthesis => self.cast_synthesis(5, 1.8),
+            Actions::PrudentSynthesis => self.cast_synthesis(5, 1.8),
 
-            Skills::DelicateSynthesis => {
+            Actions::DelicateSynthesis => {
                 self.cast_synthesis(0, 1.0);
                 self.cast_touch(10, 1.0, 1);
             }
 
-            Skills::BasicTouch => {
+            Actions::BasicTouch => {
                 self.cast_touch(10, 1.0, 1);
                 self.buffs.touch_combo_stage = 1 + 2;
             }
-            Skills::HastyTouch => self.cast_touch(10, 1.0, 1),
-            Skills::StandardTouch => {
+            Actions::HastyTouch => self.cast_touch(10, 1.0, 1),
+            Actions::StandardTouch => {
                 if self.buffs.touch_combo_stage == 1 {
                     self.buffs.touch_combo_stage = 2 + 2;
                 };
                 self.cast_touch(10, 1.25, 1)
             }
-            Skills::AdvancedTouch => self.cast_touch(10, 1.5, 1),
-            Skills::ByregotsBlessing => {
+            Actions::AdvancedTouch => self.cast_touch(10, 1.5, 1),
+            Actions::ByregotsBlessing => {
                 let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).min(3.0);
                 self.cast_touch(10, e, -(self.buffs.inner_quiet as i8));
             }
-            Skills::PreciseTouch => {
+            Actions::PreciseTouch => {
                 self.cast_touch(10, 1.5, 2);
                 self.buffs.heart_and_soul = 0;
             }
-            Skills::PrudentTouch => self.cast_touch(5, 1.0, 1),
-            Skills::FocusedTouch => self.cast_touch(10, 1.5, 1),
-            Skills::PreparatoryTouch => self.cast_touch(20, 2.0, 2),
-            Skills::TrainedFinesse => self.cast_touch(0, 1.0, 0),
+            Actions::PrudentTouch => self.cast_touch(5, 1.0, 1),
+            Actions::FocusedTouch => self.cast_touch(10, 1.5, 1),
+            Actions::PreparatoryTouch => self.cast_touch(20, 2.0, 2),
+            Actions::TrainedFinesse => self.cast_touch(0, 1.0, 0),
 
-            Skills::TricksOfTheTrade => {
+            Actions::TricksOfTheTrade => {
                 self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
                 self.buffs.heart_and_soul = 0;
             }
 
-            Skills::MastersMend => {
+            Actions::MastersMend => {
                 self.durability = self.recipe.durability.min(self.durability + 30);
             }
-            Skills::WasteNot => {
+            Actions::WasteNot => {
                 self.buffs.wast_not = self.new_duration_buff(4);
             }
-            Skills::WasteNotII => {
+            Actions::WasteNotII => {
                 self.buffs.wast_not = self.new_duration_buff(8);
             }
-            Skills::Manipulation => {
+            Actions::Manipulation => {
                 self.buffs.manipulation = self.new_duration_buff(8);
                 self.buffs.next();
                 self.step += 1;
                 return;
             }
-            Skills::MuscleMemory => {
+            Actions::MuscleMemory => {
                 self.cast_synthesis(10, 3.0);
                 self.buffs.muscle_memory = self.new_duration_buff(5);
             }
-            Skills::Reflect => {
+            Actions::Reflect => {
                 self.cast_touch(10, 1.0, 2);
             }
-            Skills::TrainedEye => {
+            Actions::TrainedEye => {
                 self.quality += self.recipe.quality;
             }
-            Skills::Veneration => {
+            Actions::Veneration => {
                 self.buffs.veneration = self.new_duration_buff(4);
             }
-            Skills::GreatStrides => {
+            Actions::GreatStrides => {
                 self.buffs.great_strides = self.new_duration_buff(3);
             }
-            Skills::Innovation => {
+            Actions::Innovation => {
                 self.buffs.innovation = self.new_duration_buff(4);
             }
-            Skills::Observe => {
+            Actions::Observe => {
                 self.buffs.observed = 2;
             }
-            Skills::FinalAppraisal => {
+            Actions::FinalAppraisal => {
                 self.buffs.final_appraisal = 5;
                 return;
             }
-            Skills::CarefulObservation => {
+            Actions::CarefulObservation => {
                 self.buffs.careful_observation_used += 1;
                 return;
             }
-            Skills::HeartAndSoul => {
+            Actions::HeartAndSoul => {
                 self.buffs.heart_and_soul = 1;
                 self.buffs.heart_and_soul_used += 1;
                 return;
             }
-            // fake skills
-            Skills::RapidSynthesisFail => self.consume_durability(10),
-            Skills::HastyTouchFail => self.consume_durability(10),
-            Skills::FocusedSynthesisFail => self.consume_durability(10),
-            Skills::FocusedTouchFail => self.consume_durability(10),
+            // fake actions
+            Actions::RapidSynthesisFail => self.consume_durability(10),
+            Actions::HastyTouchFail => self.consume_durability(10),
+            Actions::FocusedSynthesisFail => self.consume_durability(10),
+            Actions::FocusedTouchFail => self.consume_durability(10),
         }
         if self.buffs.manipulation > 0 && self.durability > 0 {
             self.durability += 5;
@@ -880,28 +883,28 @@ impl Status {
     }
 
     /// 计算当前状态下某技能的成功概率，返回结果介于[0..=100]之间。
-    pub fn success_rate(&self, action: Skills) -> u8 {
+    pub fn success_rate(&self, action: Actions) -> u8 {
         let addon = match self.condition {
             Condition::Centered => 25,
             _ => 0,
         };
         addon
             + match action {
-            Skills::HastyTouch => 60,
-            Skills::RapidSynthesis => 50,
-            Skills::FocusedSynthesis | Skills::FocusedTouch => {
-                if self.buffs.observed > 0 {
-                    100
-                } else {
-                    50
+                Actions::HastyTouch => 60,
+                Actions::RapidSynthesis => 50,
+                Actions::FocusedSynthesis | Actions::FocusedTouch => {
+                    if self.buffs.observed > 0 {
+                        100
+                    } else {
+                        50
+                    }
                 }
+                _ => return 100,
             }
-            _ => return 100,
-        }
     }
 
     /// 当前状态是否允许发动某技能。
-    pub fn is_action_allowed(&self, action: Skills) -> Result<(), CastActionError> {
+    pub fn is_action_allowed(&self, action: Actions) -> Result<(), CastActionError> {
         use CastActionError::{
             CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
             DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
@@ -912,34 +915,36 @@ impl Status {
         match action {
             _ if action.unlock_level() > self.attributes.level => Err(PlayerLevelTooLow),
 
-            Skills::TricksOfTheTrade | Skills::IntensiveSynthesis | Skills::PreciseTouch
-            if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                && self.buffs.heart_and_soul == 0 =>
-                {
-                    Err(RequireGoodOrExcellent)
-                }
+            Actions::TricksOfTheTrade | Actions::IntensiveSynthesis | Actions::PreciseTouch
+                if !matches!(self.condition, Condition::Good | Condition::Excellent)
+                    && self.buffs.heart_and_soul == 0 =>
+            {
+                Err(RequireGoodOrExcellent)
+            }
 
-            Skills::PrudentTouch | Skills::PrudentSynthesis if self.buffs.wast_not > 0 => {
+            Actions::PrudentTouch | Actions::PrudentSynthesis if self.buffs.wast_not > 0 => {
                 Err(NotAllowedInWastNotBuff)
             }
 
-            Skills::MuscleMemory | Skills::Reflect | Skills::TrainedEye if self.step != 0 => {
+            Actions::MuscleMemory | Actions::Reflect | Actions::TrainedEye if self.step != 0 => {
                 Err(OnlyAllowedInFirstStep)
             }
 
-            Skills::TrainedEye if self.attributes.level < 10 + self.recipe.job_level => {
+            Actions::TrainedEye if self.attributes.level < 10 + self.recipe.job_level => {
                 Err(LevelGapMustGreaterThanTen)
             }
 
-            Skills::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
-            Skills::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
+            Actions::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
+            Actions::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
 
-            Skills::CarefulObservation if self.buffs.careful_observation_used >= 3 => {
+            Actions::CarefulObservation if self.buffs.careful_observation_used >= 3 => {
                 Err(CarefulObservationUsed3)
             }
-            Skills::HeartAndSoul if self.buffs.heart_and_soul_used >= 1 => Err(HeartAndSoulUsed),
+            Actions::HeartAndSoul if self.buffs.heart_and_soul_used >= 1 => Err(HeartAndSoulUsed),
 
-            Skills::FocusedSynthesisFail | Skills::FocusedTouchFail if self.buffs.observed > 0 => {
+            Actions::FocusedSynthesisFail | Actions::FocusedTouchFail
+                if self.buffs.observed > 0 =>
+            {
                 Err(FocusNeverFailsAfterObserved)
             }
 
@@ -1051,7 +1056,7 @@ impl Iterator for ConditionIterator {
 mod tests {
     use test::Bencher;
 
-    use crate::{Attributes, Condition, data, Recipe, Skills, Status};
+    use crate::{data, Actions, Attributes, Condition, Recipe, Status};
 
     #[test]
     fn basic_synth() {
@@ -1066,7 +1071,7 @@ mod tests {
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
-            s.cast_action(Skills::BasicSynthesis);
+            s.cast_action(Actions::BasicSynthesis);
             assert_eq!(s.progress, pg);
         }
     }
@@ -1083,7 +1088,7 @@ mod tests {
         let mut s = Status::new(attr, recipe);
 
         struct Step {
-            a: Skills,
+            a: Actions,
             pg: u16,
             qu: u32,
             du: u16,
@@ -1091,64 +1096,64 @@ mod tests {
         }
         for (i, step) in [
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 230,
                 qu: 301,
                 du: 70,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 460,
                 qu: 632,
                 du: 60,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 690,
                 qu: 993,
                 du: 50,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 920,
                 qu: 1384,
                 du: 40,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 1150,
                 qu: 1805,
                 du: 30,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 1380,
                 qu: 2256,
                 du: 20,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 1610,
                 qu: 2737,
                 du: 10,
                 co: 1,
             },
             Step {
-                a: Skills::DelicateSynthesis,
+                a: Actions::DelicateSynthesis,
                 pg: 1840,
                 qu: 3248,
                 du: 0,
                 co: 1,
             },
         ]
-            .iter()
-            .enumerate()
+        .iter()
+        .enumerate()
         {
             s.cast_action(step.a);
             assert_eq!(
@@ -1736,10 +1741,10 @@ mod tests {
                 s.cast_action(skill);
             } else {
                 s.cast_action(match skill {
-                    Skills::RapidSynthesis => Skills::RapidSynthesisFail,
-                    Skills::HastyTouch => Skills::HastyTouchFail,
-                    Skills::FocusedSynthesis => Skills::FocusedSynthesisFail,
-                    Skills::FocusedTouch => Skills::FocusedTouchFail,
+                    Actions::RapidSynthesis => Actions::RapidSynthesisFail,
+                    Actions::HastyTouch => Actions::HastyTouchFail,
+                    Actions::FocusedSynthesis => Actions::FocusedSynthesisFail,
+                    Actions::FocusedTouch => Actions::FocusedTouchFail,
                     _ => unreachable!(),
                 })
             }
@@ -1789,29 +1794,29 @@ mod tests {
         };
         let s = Status::new(player, recipe);
         let actions = [
-            Skills::MuscleMemory,
-            Skills::Manipulation,
-            Skills::Veneration,
-            Skills::WasteNotII,
-            Skills::Groundwork,
-            Skills::Groundwork,
-            Skills::BasicTouch,
-            Skills::Innovation,
-            Skills::PreparatoryTouch,
-            Skills::BasicTouch,
-            Skills::StandardTouch,
-            Skills::AdvancedTouch,
-            Skills::Innovation,
-            Skills::PrudentTouch,
-            Skills::BasicTouch,
-            Skills::StandardTouch,
-            Skills::AdvancedTouch,
-            Skills::Innovation,
-            Skills::TrainedFinesse,
-            Skills::TrainedFinesse,
-            Skills::GreatStrides,
-            Skills::ByregotsBlessing,
-            Skills::CarefulSynthesis,
+            Actions::MuscleMemory,
+            Actions::Manipulation,
+            Actions::Veneration,
+            Actions::WasteNotII,
+            Actions::Groundwork,
+            Actions::Groundwork,
+            Actions::BasicTouch,
+            Actions::Innovation,
+            Actions::PreparatoryTouch,
+            Actions::BasicTouch,
+            Actions::StandardTouch,
+            Actions::AdvancedTouch,
+            Actions::Innovation,
+            Actions::PrudentTouch,
+            Actions::BasicTouch,
+            Actions::StandardTouch,
+            Actions::AdvancedTouch,
+            Actions::Innovation,
+            Actions::TrainedFinesse,
+            Actions::TrainedFinesse,
+            Actions::GreatStrides,
+            Actions::ByregotsBlessing,
+            Actions::CarefulSynthesis,
         ];
         b.iter(|| {
             let mut s = s.clone();
@@ -1839,19 +1844,19 @@ mod tests {
         };
         let mut s = Status::new(player, recipe);
         let actions = vec![
-            Skills::MuscleMemory,
-            Skills::Manipulation,
-            Skills::Veneration,
-            Skills::WasteNot,
-            Skills::Groundwork,
-            Skills::Groundwork,
-            Skills::CarefulSynthesis,
-            Skills::BasicTouch,
-            Skills::StandardTouch,
-            Skills::AdvancedTouch,
-            Skills::Innovation,
-            Skills::PrudentTouch,
-            Skills::PrudentTouch,
+            Actions::MuscleMemory,
+            Actions::Manipulation,
+            Actions::Veneration,
+            Actions::WasteNot,
+            Actions::Groundwork,
+            Actions::Groundwork,
+            Actions::CarefulSynthesis,
+            Actions::BasicTouch,
+            Actions::StandardTouch,
+            Actions::AdvancedTouch,
+            Actions::Innovation,
+            Actions::PrudentTouch,
+            Actions::PrudentTouch,
         ];
         for &sk in &actions {
             s.cast_action(sk);

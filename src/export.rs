@@ -1,4 +1,4 @@
-// use crate::Skills;
+// use crate::Actions;
 //
 // /// 将技能序列导出为游戏宏
 // ///
@@ -6,14 +6,14 @@
 // ///
 // /// ```rust
 // /// use ffxiv_crafting::export::to_chinese_macro;
-// /// use ffxiv_crafting::Skills;
+// /// use ffxiv_crafting::Actions;
 // /// let skill_seq = [
-// ///     Skills::Reflect,
-// ///     Skills::DelicateSynthesis,
-// ///     Skills::DelicateSynthesis,
-// ///     Skills::PreparatoryTouch,
-// ///     Skills::ByregotsBlessing,
-// ///     Skills::Groundwork,
+// ///     Actions::Reflect,
+// ///     Actions::DelicateSynthesis,
+// ///     Actions::DelicateSynthesis,
+// ///     Actions::PreparatoryTouch,
+// ///     Actions::ByregotsBlessing,
+// ///     Actions::Groundwork,
 // /// ];
 // /// let game_macro = to_chinese_macro(&skill_seq);
 // /// assert_eq!(game_macro, concat!(
@@ -25,45 +25,45 @@
 // ///     "/ac 坯料制作 <wait.3>\n",
 // /// ))
 // /// ```
-// pub fn to_chinese_macro(seq: &[Skills]) -> String {
+// pub fn to_chinese_macro(seq: &[Actions]) -> String {
 //     let mut str = String::new();
 //     for i in seq {
 //         str.push_str("/ac ");
 //         str.push_str(i.into());
 //         str.push_str(match i {
-//             Skills::MuscleMemory
-//             | Skills::Reflect
-//             | Skills::TrainedEye
-//             | Skills::BasicSynthesis
-//             | Skills::BasicTouch
-//             | Skills::MastersMend
-//             | Skills::HastyTouch
-//             | Skills::RapidSynthesis
-//             | Skills::Observe
-//             | Skills::StandardTouch
-//             | Skills::ByregotsBlessing
-//             | Skills::PreciseTouch
-//             | Skills::CarefulSynthesis
-//             | Skills::PrudentTouch
-//             | Skills::FocusedSynthesis
-//             | Skills::FocusedTouch
-//             | Skills::PreparatoryTouch
-//             | Skills::Groundwork
-//             | Skills::DelicateSynthesis
-//             | Skills::PrudentSynthesis
-//             | Skills::AdvancedTouch
-//             | Skills::TrainedFinesse
-//             | Skills::IntensiveSynthesis => " <wait.3>\n",
-//             Skills::Innovation
-//             | Skills::Veneration
-//             | Skills::GreatStrides
-//             | Skills::Manipulation
-//             | Skills::WasteNot
-//             | Skills::WasteNotII
-//             | Skills::TricksOfTheTrade
-//             | Skills::FinalAppraisal
-//             | Skills::CarefulObservation
-//             | Skills::HeartAndSoul => " <wait.2>\n",
+//             Actions::MuscleMemory
+//             | Actions::Reflect
+//             | Actions::TrainedEye
+//             | Actions::BasicSynthesis
+//             | Actions::BasicTouch
+//             | Actions::MastersMend
+//             | Actions::HastyTouch
+//             | Actions::RapidSynthesis
+//             | Actions::Observe
+//             | Actions::StandardTouch
+//             | Actions::ByregotsBlessing
+//             | Actions::PreciseTouch
+//             | Actions::CarefulSynthesis
+//             | Actions::PrudentTouch
+//             | Actions::FocusedSynthesis
+//             | Actions::FocusedTouch
+//             | Actions::PreparatoryTouch
+//             | Actions::Groundwork
+//             | Actions::DelicateSynthesis
+//             | Actions::PrudentSynthesis
+//             | Actions::AdvancedTouch
+//             | Actions::TrainedFinesse
+//             | Actions::IntensiveSynthesis => " <wait.3>\n",
+//             Actions::Innovation
+//             | Actions::Veneration
+//             | Actions::GreatStrides
+//             | Actions::Manipulation
+//             | Actions::WasteNot
+//             | Actions::WasteNotII
+//             | Actions::TricksOfTheTrade
+//             | Actions::FinalAppraisal
+//             | Actions::CarefulObservation
+//             | Actions::HeartAndSoul => " <wait.2>\n",
 //         })
 //     }
 //     str
