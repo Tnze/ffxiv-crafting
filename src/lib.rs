@@ -1,4 +1,3 @@
-#![feature(mixed_integer_ops)]
 #![cfg_attr(test, feature(test))]
 
 #[cfg(test)]
@@ -633,7 +632,7 @@ impl Status {
         }
     }
 
-    fn calc_durability(&self, durability: u16) -> u16 {
+    pub fn calc_durability(&self, durability: u16) -> u16 {
         let mut reduce = durability;
         if let Condition::Sturdy = self.condition {
             reduce -= reduce / 2;
