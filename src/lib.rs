@@ -778,7 +778,9 @@ impl Status {
             }
             Actions::IntensiveSynthesis => {
                 self.cast_synthesis(10, 4.0);
-                self.buffs.heart_and_soul = 0;
+                if !matches!(self.condition, Condition::Good | Condition::Excellent) {
+                    self.buffs.heart_and_soul = 0;
+                }
             }
             Actions::PrudentSynthesis => self.cast_synthesis(5, 1.8),
 
@@ -805,7 +807,9 @@ impl Status {
             }
             Actions::PreciseTouch => {
                 self.cast_touch(10, 1.5, 2);
-                self.buffs.heart_and_soul = 0;
+                if !matches!(self.condition, Condition::Good | Condition::Excellent) {
+                    self.buffs.heart_and_soul = 0;
+                }
             }
             Actions::PrudentTouch => self.cast_touch(5, 1.0, 1),
             Actions::FocusedTouch => self.cast_touch(10, 1.5, 1),
@@ -814,7 +818,9 @@ impl Status {
 
             Actions::TricksOfTheTrade => {
                 self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
-                self.buffs.heart_and_soul = 0;
+                if !matches!(self.condition, Condition::Good | Condition::Excellent) {
+                    self.buffs.heart_and_soul = 0;
+                }
             }
 
             Actions::MastersMend => {
