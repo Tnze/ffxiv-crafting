@@ -515,7 +515,7 @@ pub struct Status {
     /// 本次制作配方
     pub recipe: Recipe,
     /// 预计算数据
-    caches: Caches,
+    pub caches: Caches,
 
     /// 剩余耐久
     pub durability: u16,
@@ -534,13 +534,15 @@ pub struct Status {
 
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-struct Caches {
-    base_synth: f32,
-    base_touch: f32,
+pub struct Caches {
+    /// 无buff效果下100效率的作业技能能推动的进展数值
+    pub base_synth: f32,
+    /// 无buff效果下100效率的加工技能能推动的品质数值
+    pub base_touch: f32,
 }
 
 impl Caches {
-    fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
+    pub fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
         let rt = data::recipe_level_table(recipe.rlv);
         Self {
             base_synth: {
