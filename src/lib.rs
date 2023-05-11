@@ -20,7 +20,8 @@ pub mod export;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Actions {
-    BasicSynthesis,
+    // Reserve 0 so that Option<Actions> can be initialized to 0 as a None value.
+    BasicSynthesis = 1,
     BasicTouch,
     MastersMend,
     HastyTouch,
@@ -1064,6 +1065,17 @@ mod tests {
     use test::Bencher;
 
     use crate::{data, Actions, Attributes, Condition, Recipe, Status};
+
+    #[test]
+    fn option_actions() {
+        use std::mem::{size_of, transmute};
+        // For Option<Actions>, the None value has to be represented by 0,
+        // to achieve rapid initialization of large Actions arrays.
+        assert_eq!(size_of::<Option<Actions>>(), 1);
+        unsafe {
+            assert_eq!(transmute::<Option<Actions>, u8>(None), 0);
+        }
+    }
 
     #[test]
     fn basic_synth() {
