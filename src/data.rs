@@ -1,19 +1,4 @@
-use crate::Actions;
-
-pub struct RecipeLevel {
-    pub class_job_level: u8,
-    pub stars: u8,
-    pub suggested_craftsmanship: u16,
-    pub suggested_control: u16,
-    pub difficulty: u16,
-    pub quality: u32,
-    pub progress_divider: u8,
-    pub quality_divider: u8,
-    pub progress_modifier: u8,
-    pub quality_modifier: u8,
-    pub durability: u16,
-    pub conditions_flag: u16,
-}
+use crate::{Actions, RecipeLevel};
 
 pub fn recipe_level_table(rlv: i32) -> RecipeLevel {
     let a = match rlv {
@@ -682,53 +667,6 @@ pub fn recipe_level_table(rlv: i32) -> RecipeLevel {
         quality_modifier: a.9,
         durability: a.10,
         conditions_flag: a.11,
-    }
-}
-
-pub fn level_table(level: u8) -> i32 {
-    match level {
-        x if x <= 50 => x as i32,
-        51 => 120,
-        52 => 125,
-        53 => 130,
-        54 => 133,
-        55 => 136,
-        56 => 139,
-        57 => 142,
-        58 => 145,
-        59 => 148,
-        60 => 150,
-        61 => 260,
-        62 => 265,
-        63 => 270,
-        64 => 273,
-        65 => 276,
-        66 => 279,
-        67 => 282,
-        68 => 285,
-        69 => 288,
-        70 => 290,
-        71 => 390,
-        72 => 395,
-        73 => 400,
-        74 => 403,
-        75 => 406,
-        76 => 409,
-        77 => 412,
-        78 => 415,
-        79 => 418,
-        80 => 420,
-        81 => 517,
-        82 => 520,
-        83 => 525,
-        84 => 530,
-        85 => 535,
-        86 => 540,
-        87 => 545,
-        88 => 550,
-        89 => 555,
-        90 => 560,
-        x => unreachable!("Player level cannot be {}", x),
     }
 }
 

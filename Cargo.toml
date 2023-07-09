@@ -1,6 +1,6 @@
 [package]
 name = "ffxiv-crafting"
-version = "6.3.1"
+version = "6.3.2"
 edition = "2021"
 authors = ["Tnze <cjd001113@outlook.com>"]
 description = "A crafting simulator of FFXIV."
@@ -12,7 +12,7 @@ keywords = ["ff14", "ffxiv"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.162", optional = true, features = ["derive"] }
+serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [features]
 serde-support = ["serde"]

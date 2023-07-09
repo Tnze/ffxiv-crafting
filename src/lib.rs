@@ -347,12 +347,6 @@ pub struct Attributes {
     pub craft_points: i32,
 }
 
-impl Attributes {
-    fn level_value(&self) -> i32 {
-        data::level_table(self.level)
-    }
-}
-
 /// 储存了一次制作中配方的信息。
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
@@ -395,6 +389,23 @@ pub struct Recipe {
     /// assert_eq!(belong(cond_flag, Condition::Malleable), false);
     /// assert_eq!(belong(cond_flag, Condition::Primed), false);
     /// ```
+    pub conditions_flag: u16,
+}
+
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct RecipeLevel {
+    pub class_job_level: u8,
+    pub stars: u8,
+    pub suggested_craftsmanship: u16,
+    pub suggested_control: u16,
+    pub difficulty: u16,
+    pub quality: u32,
+    pub progress_divider: u8,
+    pub quality_divider: u8,
+    pub progress_modifier: u8,
+    pub quality_modifier: u8,
+    pub durability: u16,
     pub conditions_flag: u16,
 }
 
@@ -543,21 +554,20 @@ pub struct Caches {
 }
 
 impl Caches {
-    pub fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
-        let rt = data::recipe_level_table(recipe.rlv);
+    pub fn new(attributes: &Attributes, recipe: &Recipe, rlv: &RecipeLevel) -> Self {
         Self {
             base_synth: {
                 let mut base =
-                    attributes.craftsmanship as f32 * 10.0 / rt.progress_divider as f32 + 2.0;
-                if attributes.level_value() <= recipe.rlv {
-                    base *= rt.progress_modifier as f32 * 0.01
+                    attributes.craftsmanship as f32 * 10.0 / rlv.progress_divider as f32 + 2.0;
+                if attributes.level <= recipe.job_level {
+                    base *= rlv.progress_modifier as f32 * 0.01
                 }
                 base.floor()
             },
             base_touch: {
-                let mut base = attributes.control as f32 * 10.0 / rt.quality_divider as f32 + 35.0;
-                if attributes.level_value() <= recipe.rlv {
-                    base *= rt.quality_modifier as f32 * 0.01
+                let mut base = attributes.control as f32 * 10.0 / rlv.quality_divider as f32 + 35.0;
+                if attributes.level <= recipe.job_level {
+                    base *= rlv.quality_modifier as f32 * 0.01
                 }
                 base.floor()
             },
@@ -620,10 +630,10 @@ impl Display for CastActionError {
 impl Error for CastActionError {}
 
 impl Status {
-    pub fn new(attributes: Attributes, recipe: Recipe) -> Self {
+    pub fn new(attributes: Attributes, recipe: Recipe, rlv: RecipeLevel) -> Self {
         Status {
             buffs: Buffs::default(),
-            caches: Caches::new(&attributes, &recipe),
+            caches: Caches::new(&attributes, &recipe, &rlv),
             attributes,
             recipe,
             durability: recipe.durability,
@@ -1086,7 +1096,7 @@ mod tests {
             craft_points: 548,
         };
         let recipe = Recipe::new(517, 50, 100, 50);
-        let mut s = Status::new(attr, recipe);
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
@@ -1104,7 +1114,7 @@ mod tests {
             craft_points: 539,
         };
         let recipe = Recipe::new(517, 100, 100, 100);
-        let mut s = Status::new(attr, recipe);
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
 
         struct Step {
             a: Actions,
@@ -1203,7 +1213,7 @@ mod tests {
             craft_points: 533,
         };
         let recipe = Recipe::new(535, 100, 100, 100);
-        let mut s = Status::new(attr, recipe);
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
 
         struct Step {
             a: i32,
@@ -1406,7 +1416,7 @@ mod tests {
             craft_points: 533,
         };
         let recipe = Recipe::new(516, 100, 100, 86);
-        let mut s = Status::new(attr, recipe);
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
 
         struct Step {
             a: i32,
@@ -1811,7 +1821,7 @@ mod tests {
             control: 3524,
             craft_points: 626,
         };
-        let s = Status::new(player, recipe);
+        let s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
         let actions = [
             Actions::MuscleMemory,
             Actions::Manipulation,
@@ -1861,7 +1871,7 @@ mod tests {
             control: 3340,
             craft_points: 654,
         };
-        let mut s = Status::new(player, recipe);
+        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
         let actions = vec![
             Actions::MuscleMemory,
             Actions::Manipulation,
