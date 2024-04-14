@@ -278,6 +278,8 @@ pub enum Condition {
     Malleable,
     // 紫：技能效果持续增加两回合
     Primed,
+    /// 粉：下一回合必定是红球
+    GoodOmen,
 }
 
 impl From<&Condition> for &str {
@@ -292,6 +294,7 @@ impl From<&Condition> for &str {
             Condition::Pliant => "pliant",
             Condition::Malleable => "malleable",
             Condition::Primed => "primed",
+            Condition::GoodOmen => "good_omen",
         }
     }
 }
@@ -310,6 +313,7 @@ impl TryFrom<&str> for Condition {
             "pliant" => Condition::Pliant,
             "malleable" => Condition::Malleable,
             "primed" => Condition::Primed,
+            "good_omen" => Condition::GoodOmen,
             _ => return Err(()),
         })
     }
@@ -1016,12 +1020,13 @@ impl ConditionIterator {
             flag,
             rate: 0.0,
             good_chance: [0.2, 0.25][(level >= 63) as usize],
-            step: Some(Condition::Good),
+            step: Some(Condition::Normal),
         }
     }
 
     fn next_cond(cond: Condition) -> Option<Condition> {
         match cond {
+            Condition::Normal => Some(Condition::Good),
             Condition::Good => Some(Condition::Excellent),
             Condition::Excellent => Some(Condition::Poor),
             Condition::Poor => Some(Condition::Centered),
@@ -1029,8 +1034,8 @@ impl ConditionIterator {
             Condition::Sturdy => Some(Condition::Pliant),
             Condition::Pliant => Some(Condition::Malleable),
             Condition::Malleable => Some(Condition::Primed),
-            Condition::Primed => Some(Condition::Normal),
-            Condition::Normal => None,
+            Condition::Primed => Some(Condition::GoodOmen),
+            Condition::GoodOmen => None,
         }
     }
 }
@@ -1063,6 +1068,7 @@ impl Iterator for ConditionIterator {
             Condition::Pliant => 0.12,
             Condition::Malleable => 0.12,
             Condition::Primed => 0.12,
+            Condition::GoodOmen => 0.12,
             Condition::Normal => 1.0 - self.rate,
         };
         self.rate += rate;

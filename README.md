@@ -29,4 +29,4 @@ https://ngabbs.com/read.php?&tid=29796644
 
 ### 适配版本
 
-国服6.0X
+国服6.5X
