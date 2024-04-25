@@ -10,8 +10,13 @@ license = "MIT"
 keywords = ["ff14", "ffxiv"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "ffxiv_crafting"
+crate-type = ["cdylib"]
 
 [dependencies]
+pyo3 = "0.21.2"
+rand = "0.8.5"
 serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [features]

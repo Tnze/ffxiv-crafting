@@ -7,11 +7,15 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
+use pyo3::exceptions::PyValueError;
 #[cfg(feature = "serde-support")]
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+
+use pyo3::prelude::*;
+use rand::{random, seq::SliceRandom, thread_rng};
 
 pub mod data;
 pub mod export;
@@ -19,6 +23,7 @@ pub mod export;
 /// 代表一个玩家在作业时可以使用的一个技能的枚举。
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
+#[pyclass]
 pub enum Actions {
     // Reserve 0 so that Option<Actions> can be initialized to 0 as a None value.
     BasicSynthesis = 1,
@@ -258,6 +263,7 @@ impl de::Error for UnknownSkillErr {
 /// 代表了当前的“制作状态”，也就是俗称的球色。
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
+#[pyclass]
 pub enum Condition {
     // 白：通常
     Normal,
@@ -340,20 +346,39 @@ impl Condition {
 /// 玩家装备属性
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[pyclass]
 pub struct Attributes {
     /// 玩家等级
+    #[pyo3(get)]
     pub level: u8,
     /// 制作精度
+    #[pyo3(get)]
     pub craftsmanship: i32,
     /// 加工精度
+    #[pyo3(get)]
     pub control: i32,
     /// 制作力
+    #[pyo3(get)]
     pub craft_points: i32,
+}
+
+#[pymethods]
+impl Attributes {
+    #[new]
+    fn new(level: u8, craftsmanship: i32, control: i32, craft_points: i32) -> Self {
+        Self {
+            level,
+            craftsmanship,
+            control,
+            craft_points,
+        }
+    }
 }
 
 /// 储存了一次制作中配方的信息。
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[pyclass]
 pub struct Recipe {
     /// 配方等级
     pub rlv: i32,
@@ -362,12 +387,15 @@ pub struct Recipe {
     pub job_level: u8,
 
     /// 难度（最大进展）
+    #[pyo3(get)]
     pub difficulty: u16,
 
     /// 最高品质
+    #[pyo3(get)]
     pub quality: u32,
 
     /// 耐久
+    #[pyo3(get)]
     pub durability: u16,
 
     /// 制作状态标志位，用于表示本次制作有可能出现哪些球色。
@@ -398,6 +426,7 @@ pub struct Recipe {
 
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[pyclass]
 pub struct RecipeLevel {
     pub class_job_level: u8,
     pub stars: u8,
@@ -413,7 +442,17 @@ pub struct RecipeLevel {
     pub conditions_flag: u16,
 }
 
+#[pymethods]
+impl RecipeLevel {
+    #[new]
+    fn new(rlv: i32) -> Self {
+        data::recipe_level_table(rlv)
+    }
+}
+
+#[pymethods]
 impl Recipe {
+    #[new]
     pub fn new(
         rlv: i32,
         difficulty_factor: u16,
@@ -435,6 +474,7 @@ impl Recipe {
 /// Buffs 储存了一次制作中玩家全部buff状态信息
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Default, Debug)]
+#[pyclass]
 pub struct Buffs {
     /// 坚信
     pub muscle_memory: u8,
@@ -523,6 +563,7 @@ impl Buffs {
 /// Status 储存一次制作模拟所需的全部状态信息
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
+#[pyclass]
 pub struct Status {
     /// 玩家当前身上的buff
     pub buffs: Buffs,
@@ -534,17 +575,23 @@ pub struct Status {
     pub caches: Caches,
 
     /// 剩余耐久
+    #[pyo3(get)]
     pub durability: u16,
     /// 剩余制作力
+    #[pyo3(get)]
     pub craft_points: i32,
     /// 进展
+    #[pyo3(get)]
     pub progress: u16,
     /// 品质
+    #[pyo3(get)]
     pub quality: u32,
 
     /// 步数
+    #[pyo3(get)]
     pub step: i32,
     /// 制作状态
+    #[pyo3(get)]
     pub condition: Condition,
 }
 
@@ -582,6 +629,7 @@ impl Caches {
 /// 技能释放错误
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Debug)]
+#[pyclass]
 pub enum CastActionError {
     /// 耐久不足
     DurabilityNotEnough,
@@ -633,7 +681,15 @@ impl Display for CastActionError {
 
 impl Error for CastActionError {}
 
+impl From<CastActionError> for PyErr {
+    fn from(value: CastActionError) -> Self {
+        PyValueError::new_err(format!("{value}"))
+    }
+}
+
+#[pymethods]
 impl Status {
+    #[new]
     pub fn new(attributes: Attributes, recipe: Recipe, rlv: RecipeLevel) -> Self {
         Status {
             buffs: Buffs::default(),
@@ -647,6 +703,27 @@ impl Status {
             quality: 0,
             step: 0,
         }
+    }
+
+    #[getter]
+    pub fn buffs(&self) -> Vec<u8> {
+        vec![
+            self.buffs.muscle_memory,
+            self.buffs.great_strides,
+            self.buffs.veneration,
+            self.buffs.innovation,
+            self.buffs.inner_quiet,
+            self.buffs.final_appraisal,
+            self.buffs.manipulation,
+            self.buffs.wast_not,
+            if self.buffs.heart_and_soul_used > 0 {
+                self.buffs.heart_and_soul + 1
+            } else {
+                0
+            },
+            self.buffs.touch_combo_stage,
+            self.buffs.observed,
+        ]
     }
 
     pub fn calc_durability(&self, durability: u16) -> u16 {
@@ -772,7 +849,8 @@ impl Status {
     }
 
     /// 发动一次技能。
-    pub fn cast_action(&mut self, action: Actions) {
+    pub fn cast_action(&mut self, action: Actions) -> Result<(), CastActionError> {
+        self.is_action_allowed(action)?;
         self.craft_points -= self.craft_point(action);
         match action {
             Actions::BasicSynthesis => {
@@ -853,7 +931,7 @@ impl Status {
                 self.buffs.manipulation = self.new_duration_buff(8);
                 self.buffs.next();
                 self.step += 1;
-                return;
+                return Ok(());
             }
             Actions::MuscleMemory => {
                 self.cast_synthesis(10, 3.0);
@@ -879,16 +957,16 @@ impl Status {
             }
             Actions::FinalAppraisal => {
                 self.buffs.final_appraisal = 5;
-                return;
+                return Ok(());
             }
             Actions::CarefulObservation => {
                 self.buffs.careful_observation_used += 1;
-                return;
+                return Ok(());
             }
             Actions::HeartAndSoul => {
                 self.buffs.heart_and_soul = 1;
                 self.buffs.heart_and_soul_used += 1;
-                return;
+                return Ok(());
             }
             // fake actions
             Actions::RapidSynthesisFail => self.consume_durability(10),
@@ -902,6 +980,7 @@ impl Status {
         }
         self.buffs.next();
         self.step += 1;
+        Ok(())
     }
 
     /// 计算当前状态下某技能的成功概率，返回结果介于[0..=100]之间。
@@ -926,7 +1005,7 @@ impl Status {
     }
 
     /// 当前状态是否允许发动某技能。
-    pub fn is_action_allowed(&self, action: Actions) -> Result<(), CastActionError> {
+    fn is_action_allowed(&self, action: Actions) -> Result<(), CastActionError> {
         use CastActionError::{
             CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
             DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
@@ -992,6 +1071,46 @@ impl Status {
     pub fn high_quality_probability(&self) -> Option<i32> {
         let percent = self.quality * 100 / self.recipe.quality;
         data::high_quality_table(percent)
+    }
+
+    pub fn simulate_one_step(
+        &mut self,
+        action: Actions,
+        force_success: bool,
+        random_condition: bool,
+    ) -> Result<(), CastActionError> {
+        let mut rng = thread_rng();
+        let is_success = force_success || self.success_rate(action) as f32 / 100.0 > random();
+        if is_success {
+            self.cast_action(action)?;
+        } else {
+            self.cast_action(match action {
+                Actions::RapidSynthesis => Actions::RapidSynthesisFail,
+                Actions::HastyTouch => Actions::HastyTouchFail,
+                Actions::FocusedSynthesis => Actions::FocusedSynthesisFail,
+                Actions::FocusedTouch => Actions::FocusedTouchFail,
+                _ => unreachable!(),
+            })?;
+        }
+        if !matches!(action, Actions::FinalAppraisal | Actions::HeartAndSoul) {
+            self.condition = match self.condition {
+                Condition::Good if !random_condition => Condition::Normal,
+                Condition::Poor if !random_condition => Condition::Excellent,
+                Condition::GoodOmen => Condition::Good,
+                _ if random_condition => {
+                    ConditionIterator::new(
+                        self.recipe.conditions_flag as i32,
+                        self.attributes.level as i32,
+                    )
+                    .collect::<Vec<_>>()
+                    .choose_weighted(&mut rng, |c| c.1)
+                    .unwrap()
+                    .0
+                }
+                _ => Condition::Normal,
+            };
+        }
+        Ok(())
     }
 }
 
@@ -1106,7 +1225,7 @@ mod tests {
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
-            s.cast_action(Actions::BasicSynthesis);
+            s.cast_action(Actions::BasicSynthesis).unwrap();
             assert_eq!(s.progress, pg);
         }
     }
@@ -1190,7 +1309,7 @@ mod tests {
         .iter()
         .enumerate()
         {
-            s.cast_action(step.a);
+            s.cast_action(step.a).unwrap();
             assert_eq!(
                 s.progress, step.pg,
                 "step [{}] progress simulation fail: want {}, get {}",
@@ -1392,7 +1511,7 @@ mod tests {
             },
         ] {
             let skill = data::action_table(step.a).unwrap();
-            s.cast_action(skill);
+            s.cast_action(skill).unwrap();
             // println!("casting: {:?}", skill);
             assert_eq!(
                 s.progress, step.pg,
@@ -1773,7 +1892,7 @@ mod tests {
             let skill = data::action_table(step.a).unwrap();
             // println!("casting: {:?} {}", skill,  s.craft_points);
             if step.su {
-                s.cast_action(skill);
+                s.cast_action(skill).unwrap();
             } else {
                 s.cast_action(match skill {
                     Actions::RapidSynthesis => Actions::RapidSynthesisFail,
@@ -1782,6 +1901,7 @@ mod tests {
                     Actions::FocusedTouch => Actions::FocusedTouchFail,
                     _ => unreachable!(),
                 })
+                .unwrap()
             }
             assert_eq!(
                 s.progress, step.pg,
@@ -1856,7 +1976,7 @@ mod tests {
         b.iter(|| {
             let mut s = s.clone();
             for sk in &actions {
-                s.cast_action(*sk);
+                s.cast_action(*sk).unwrap();
             }
         })
     }
@@ -1894,8 +2014,21 @@ mod tests {
             Actions::PrudentTouch,
         ];
         for &sk in &actions {
-            s.cast_action(sk);
+            s.cast_action(sk).unwrap();
         }
         assert_eq!(s.quality, 1865);
     }
+}
+
+#[pymodule]
+fn ffxiv_crafting(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<Actions>()?;
+    m.add_class::<Buffs>()?;
+    m.add_class::<Condition>()?;
+    m.add_class::<Attributes>()?;
+    m.add_class::<Recipe>()?;
+    m.add_class::<RecipeLevel>()?;
+    m.add_class::<CastActionError>()?;
+    m.add_class::<Status>()?;
+    Ok(())
 }
