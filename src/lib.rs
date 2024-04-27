@@ -15,7 +15,7 @@ use serde::{
 };
 
 use pyo3::prelude::*;
-use rand::{random, seq::SliceRandom, thread_rng};
+use rand::{rngs::SmallRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 
 pub mod data;
 pub mod export;
@@ -574,6 +574,8 @@ pub struct Status {
     /// 预计算数据
     pub caches: Caches,
 
+    rng: SmallRng,
+
     /// 剩余耐久
     #[pyo3(get)]
     pub durability: u16,
@@ -690,12 +692,21 @@ impl From<CastActionError> for PyErr {
 #[pymethods]
 impl Status {
     #[new]
-    pub fn new(attributes: Attributes, recipe: Recipe, rlv: RecipeLevel) -> Self {
+    pub fn new(
+        attributes: Attributes,
+        recipe: Recipe,
+        rlv: RecipeLevel,
+        seed: Option<u64>,
+    ) -> Self {
         Status {
             buffs: Buffs::default(),
             caches: Caches::new(&attributes, &recipe, &rlv),
             attributes,
             recipe,
+            rng: match seed {
+                Some(seed) => SmallRng::seed_from_u64(seed),
+                None => SmallRng::from_rng(thread_rng()).unwrap(),
+            },
             durability: recipe.durability,
             craft_points: attributes.craft_points,
             condition: Condition::Normal,
@@ -1079,8 +1090,7 @@ impl Status {
         force_success: bool,
         random_condition: bool,
     ) -> Result<(), CastActionError> {
-        let mut rng = thread_rng();
-        let is_success = force_success || self.success_rate(action) as f32 / 100.0 > random();
+        let is_success = force_success || self.success_rate(action) as f32 / 100.0 > self.rng.gen();
         if is_success {
             self.cast_action(action)?;
         } else {
@@ -1103,7 +1113,7 @@ impl Status {
                         self.attributes.level as i32,
                     )
                     .collect::<Vec<_>>()
-                    .choose_weighted(&mut rng, |c| c.1)
+                    .choose_weighted(&mut self.rng, |c| c.1)
                     .unwrap()
                     .0
                 }
@@ -1221,7 +1231,7 @@ mod tests {
             craft_points: 548,
         };
         let recipe = Recipe::new(517, 50, 100, 50);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv), None);
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
@@ -1239,7 +1249,7 @@ mod tests {
             craft_points: 539,
         };
         let recipe = Recipe::new(517, 100, 100, 100);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv), None);
 
         struct Step {
             a: Actions,
@@ -1338,7 +1348,7 @@ mod tests {
             craft_points: 533,
         };
         let recipe = Recipe::new(535, 100, 100, 100);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv), None);
 
         struct Step {
             a: i32,
@@ -1541,7 +1551,7 @@ mod tests {
             craft_points: 533,
         };
         let recipe = Recipe::new(516, 100, 100, 86);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv), None);
 
         struct Step {
             a: i32,
@@ -1947,7 +1957,7 @@ mod tests {
             control: 3524,
             craft_points: 626,
         };
-        let s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        let s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv), None);
         let actions = [
             Actions::MuscleMemory,
             Actions::Manipulation,
@@ -1997,7 +2007,7 @@ mod tests {
             control: 3340,
             craft_points: 654,
         };
-        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv), None);
         let actions = vec![
             Actions::MuscleMemory,
             Actions::Manipulation,
