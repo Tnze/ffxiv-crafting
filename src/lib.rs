@@ -467,12 +467,12 @@ pub struct Buffs {
     pub observed: u8,
 }
 
-fn round_down(v: f32, scale: f32) -> f32 {
+fn round_down(v: f64, scale: f64) -> f64 {
     (v * scale).floor() / scale
 }
 
 impl Buffs {
-    pub(crate) fn synthesis(&self, skill_e: f32) -> f32 {
+    pub(crate) fn synthesis(&self, skill_e: f64) -> f64 {
         let mut e = 0.0;
         if self.muscle_memory > 0 {
             e += 1.0;
@@ -489,7 +489,7 @@ impl Buffs {
         }
     }
 
-    pub(crate) fn touch(&self, skill_e: f32) -> f32 {
+    pub(crate) fn touch(&self, skill_e: f64) -> f64 {
         let mut bm = 1.0;
         if self.great_strides > 0 {
             bm += 1.0;
@@ -497,7 +497,7 @@ impl Buffs {
         if self.innovation > 0 {
             bm += 0.5;
         }
-        let iq = 1.0 + self.inner_quiet as f32 * 0.1;
+        let iq = 1.0 + self.inner_quiet as f64 * 0.1;
         skill_e * bm * iq
     }
 
@@ -666,17 +666,19 @@ impl Status {
             .saturating_sub(self.calc_durability(durability));
     }
 
-    pub fn calc_synthesis(&self, efficiency: f32) -> u16 {
-        (self.caches.base_synth * self.condition.synth_ratio() * self.buffs.synthesis(efficiency))
-            as u16
+    pub fn calc_synthesis(&self, efficiency: f64) -> u16 {
+        (self.caches.base_synth as f64
+            * self.buffs.synthesis(efficiency)
+            * self.condition.synth_ratio() as f64) as f32 as u16
     }
 
-    pub fn calc_touch(&self, efficiency: f32) -> u32 {
-        (self.caches.base_touch * self.buffs.touch(efficiency) * self.condition.touch_ratio())
-            as u32
+    pub fn calc_touch(&self, efficiency: f64) -> u32 {
+        (self.caches.base_touch as f64
+            * self.buffs.touch(efficiency)
+            * self.condition.touch_ratio() as f64) as f32 as u32
     }
 
-    fn cast_synthesis(&mut self, durability: u16, efficiency: f32) {
+    fn cast_synthesis(&mut self, durability: u16, efficiency: f64) {
         self.progress += self.calc_synthesis(efficiency);
         self.consume_durability(durability);
         self.buffs.apply_synthesis();
@@ -689,7 +691,7 @@ impl Status {
         }
     }
 
-    fn cast_touch(&mut self, durability: u16, efficiency: f32, inner_quiet_addon: i8) {
+    fn cast_touch(&mut self, durability: u16, efficiency: f64, inner_quiet_addon: i8) {
         let quality_addon = self.calc_touch(efficiency);
         self.quality = (self.quality + quality_addon).min(self.recipe.quality);
         self.consume_durability(durability);
@@ -819,7 +821,7 @@ impl Status {
             }
             Actions::AdvancedTouch => self.cast_touch(10, 1.5, 1),
             Actions::ByregotsBlessing => {
-                let e = (1.0 + self.buffs.inner_quiet as f32 * 0.2).min(3.0);
+                let e = (1.0 + self.buffs.inner_quiet as f64 * 0.2).min(3.0);
                 self.cast_touch(10, e, -(self.buffs.inner_quiet as i8));
             }
             Actions::PreciseTouch => {
@@ -1897,5 +1899,27 @@ mod tests {
             s.cast_action(sk);
         }
         assert_eq!(s.quality, 1865);
+    }
+
+    #[test]
+    fn test2() {
+        let recipe = Recipe {
+            rlv: 640,
+            job_level: 90,
+            difficulty: 6600,
+            quality: 14040,
+            durability: 70,
+            conditions_flag: 15,
+        };
+        let player = Attributes {
+            level: 90,
+            craftsmanship: 4048,
+            control: 4005,
+            craft_points: 594,
+        };
+        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        s.cast_action(Actions::Veneration);
+        s.cast_action(Actions::Groundwork);
+        assert_eq!(s.progress, 1350);
     }
 }
