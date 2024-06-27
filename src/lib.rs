@@ -14,7 +14,6 @@ use serde::{
 };
 
 pub mod data;
-pub mod export;
 
 /// 代表一个玩家在作业时可以使用的一个技能的枚举。
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -41,8 +40,8 @@ pub enum Actions {
     CarefulSynthesis,
     Manipulation,
     PrudentTouch,
-    FocusedSynthesis,
-    FocusedTouch,
+    // FocusedSynthesis,
+    // FocusedTouch,
     Reflect,
     PreparatoryTouch,
     Groundwork,
@@ -54,9 +53,16 @@ pub enum Actions {
     TrainedFinesse,
     CarefulObservation,
     HeartAndSoul,
+    // 7.0
+    RefinedTouch,
+    DaringTouch,
+    ImmaculateMend,
+    QuickInnovation,
+    TrainedPerfection,
     // fake actions
     RapidSynthesisFail,
     HastyTouchFail,
+    DaringTouchFail,
     FocusedSynthesisFail,
     FocusedTouchFail,
 }
@@ -122,8 +128,6 @@ impl Actions {
             Actions::CarefulSynthesis => 62,
             Actions::Manipulation => 65,
             Actions::PrudentTouch => 66,
-            Actions::FocusedSynthesis => 67,
-            Actions::FocusedTouch => 68,
             Actions::Reflect => 69,
             Actions::PreparatoryTouch => 71,
             Actions::Groundwork => 72,
@@ -135,9 +139,16 @@ impl Actions {
             Actions::TrainedFinesse => 90,
             Actions::CarefulObservation => 55,
             Actions::HeartAndSoul => 86,
+            // 7.0
+            Actions::RefinedTouch => 92,
+            Actions::DaringTouch => 96,
+            Actions::ImmaculateMend => 98,
+            Actions::QuickInnovation => 96,
+            Actions::TrainedPerfection => 100,
             // fake actions
             Actions::RapidSynthesisFail => 9,
             Actions::HastyTouchFail => 9,
+            Actions::DaringTouchFail => 96,
             Actions::FocusedSynthesisFail => 67,
             Actions::FocusedTouchFail => 68,
         }
@@ -167,8 +178,6 @@ impl From<&Actions> for &str {
             Actions::CarefulSynthesis => "careful_synthesis",
             Actions::Manipulation => "manipulation",
             Actions::PrudentTouch => "prudent_touch",
-            Actions::FocusedSynthesis => "focused_synthesis",
-            Actions::FocusedTouch => "focused_touch",
             Actions::Reflect => "reflect",
             Actions::PreparatoryTouch => "preparatory_touch",
             Actions::Groundwork => "groundwork",
@@ -180,9 +189,16 @@ impl From<&Actions> for &str {
             Actions::TrainedFinesse => "trained_finesse",
             Actions::CarefulObservation => "careful_observation",
             Actions::HeartAndSoul => "heart_and_soul",
+            // 7.0
+            Actions::RefinedTouch => "refined_touch",
+            Actions::DaringTouch => "daring_touch",
+            Actions::ImmaculateMend => "immaculate_mend",
+            Actions::QuickInnovation => "quick_innovation",
+            Actions::TrainedPerfection => "trained_perfection",
             // fake actions
             Actions::RapidSynthesisFail => "rapid_synthsis_fail",
             Actions::HastyTouchFail => "hasty_touch_fail",
+            Actions::DaringTouchFail => "daring_touch_fail",
             Actions::FocusedSynthesisFail => "focused_synthesis_fail",
             Actions::FocusedTouchFail => "focused_touch_fail",
         }
@@ -214,8 +230,6 @@ impl TryFrom<&str> for Actions {
             "careful_synthesis" | "模范制作" => Actions::CarefulSynthesis,
             "manipulation" | "掌握" => Actions::Manipulation,
             "prudent_touch" | "俭约加工" => Actions::PrudentTouch,
-            "focused_synthesis" | "注视制作" => Actions::FocusedSynthesis,
-            "focused_touch" | "注视加工" => Actions::FocusedTouch,
             "reflect" | "闲静" => Actions::Reflect,
             "preparatory_touch" | "坯料加工" => Actions::PreparatoryTouch,
             "groundwork" | "坯料制作" => Actions::Groundwork,
@@ -227,9 +241,16 @@ impl TryFrom<&str> for Actions {
             "trained_finesse" | "工匠的神技" => Actions::TrainedFinesse,
             "careful_observation" | "设计变动" => Actions::CarefulObservation,
             "heart_and_soul" | "专心致志" => Actions::HeartAndSoul,
+            // 7.0
+            "refined_touch" => Actions::RefinedTouch,
+            "daring_touch" => Actions::DaringTouch,
+            "immaculate_mend" => Actions::ImmaculateMend,
+            "quick_innovation" => Actions::QuickInnovation,
+            "trained_perfection" => Actions::TrainedPerfection,
             // fake actions
             "rapid_synthesis_fail" => Actions::RapidSynthesisFail,
             "hasty_touch_fail" => Actions::HastyTouchFail,
+            "daring_touch_fail" => Actions::DaringTouchFail,
             "focused_synthesis_fail" => Actions::FocusedSynthesisFail,
             "focused_touch_fail" => Actions::FocusedTouchFail,
             _ => return Err(UnknownSkillErr),
@@ -259,24 +280,24 @@ impl de::Error for UnknownSkillErr {
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug)]
 pub enum Condition {
-    // 白：通常
+    /// 白：通常
     Normal,
-    // 红：高品质，加工效率1.5倍
+    /// 红：高品质，加工效率1.5倍
     Good,
-    // 彩：最高品质
+    /// 彩：最高品质
     Excellent,
-    // 黑：低品质
+    /// 黑：低品质
     Poor,
 
-    // 黄：成功率增加 25%
+    /// 黄：成功率增加 25%
     Centered,
-    // 蓝：耐久消耗降低 50%, 效果可与俭约叠加
+    /// 蓝：耐久消耗降低 50%, 效果可与俭约叠加
     Sturdy,
-    // 绿：CP 消耗减少 50%
+    /// 绿：CP 消耗减少 50%
     Pliant,
-    // 深蓝：作业效率1.5倍
+    /// 深蓝：作业效率1.5倍
     Malleable,
-    // 紫：技能效果持续增加两回合
+    /// 紫：技能效果持续增加两回合
     Primed,
     /// 粉：下一回合必定是红球
     GoodOmen,
@@ -453,18 +474,36 @@ pub struct Buffs {
     /// 俭约 OR 长期俭约
     pub wast_not: u8,
     /// 专心致志
-    pub heart_and_soul: u8,
+    pub heart_and_soul: LimitedActionState,
+    /// 工匠的绝技
+    pub trained_perfection: LimitedActionState,
     /// 设计变动使用次数
     /// 假想buff，用于记录设计变动使用的次数
     pub careful_observation_used: u8,
-    /// 禁止使用专心致志
-    /// 假想buff，用于禁止使用专心致志
-    pub heart_and_soul_used: u8,
+    /// 禁止使用Quick改革
+    pub quick_innovation_used: u8,
     /// 加工连击状态：0无，1中级加工预备，2上级加工预备
     pub touch_combo_stage: u8,
     /// 观察（注视预备）
     /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
     pub observed: u8,
+    /// 仓促成功
+    /// 假想buff，用于处理 仓促-DaringTouch连击
+    pub hasty_touched: u8,
+}
+
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug)]
+pub enum LimitedActionState {
+    Unused,
+    Active,
+    Used,
+}
+
+impl Default for LimitedActionState {
+    fn default() -> Self {
+        LimitedActionState::Unused
+    }
 }
 
 fn round_down(v: f64, scale: f64) -> f64 {
@@ -517,6 +556,7 @@ impl Buffs {
         self.wast_not = self.wast_not.saturating_sub(1);
         self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
         self.observed = self.observed.saturating_sub(1);
+        self.hasty_touched = self.hasty_touched.saturating_sub(1);
     }
 }
 
@@ -609,6 +649,12 @@ pub enum CastActionError {
     HeartAndSoulUsed,
     /// 注视在观察之后无法失败
     FocusNeverFailsAfterObserved,
+    /// 必须在仓促成功后使用
+    RequireHastyTouchSuccessed,
+    /// Quick改革一次制作只能使用一次
+    QuickInnovationUsed,
+    /// 工匠的绝技一次制作只能使用一次
+    TrainedPerfectionUsed,
 }
 
 impl Display for CastActionError {
@@ -627,6 +673,9 @@ impl Display for CastActionError {
             CastActionError::CarefulObservationUsed3 => "careful observation can only use 3 times",
             CastActionError::HeartAndSoulUsed => "heart and soul can be only used once",
             CastActionError::FocusNeverFailsAfterObserved => "focus never fails after observed",
+            CastActionError::RequireHastyTouchSuccessed => "require hasty touch successed first",
+            CastActionError::QuickInnovationUsed => "quick innovation can be only used once",
+            CastActionError::TrainedPerfectionUsed => "trained perfection can be only used once",
         })
     }
 }
@@ -661,6 +710,10 @@ impl Status {
     }
 
     fn consume_durability(&mut self, durability: u16) {
+        if let LimitedActionState::Active = self.buffs.trained_perfection {
+            self.buffs.trained_perfection = LimitedActionState::Used;
+            return;
+        }
         self.durability = self
             .durability
             .saturating_sub(self.calc_durability(durability));
@@ -714,7 +767,7 @@ impl Status {
     /// 计算当前状态指定技能消耗的CP。
     /// 考虑连击与球色
     pub fn craft_point(&self, skill: Actions) -> i32 {
-        let cp = match skill {
+        let cp: i32 = match skill {
             Actions::BasicSynthesis => 0,
             Actions::BasicTouch => 18,
             Actions::MastersMend => 88,
@@ -741,8 +794,6 @@ impl Status {
             Actions::CarefulSynthesis => 7,
             Actions::Manipulation => 96,
             Actions::PrudentTouch => 25,
-            Actions::FocusedSynthesis => 5,
-            Actions::FocusedTouch => 18,
             Actions::Reflect => 6,
             Actions::PreparatoryTouch => 40,
             Actions::Groundwork => 18,
@@ -750,7 +801,7 @@ impl Status {
             Actions::IntensiveSynthesis => 6,
             Actions::TrainedEye => 250,
             Actions::AdvancedTouch => {
-                if self.buffs.touch_combo_stage == 2 {
+                if self.buffs.touch_combo_stage == 2 || self.buffs.observed > 0 {
                     18
                 } else {
                     46
@@ -760,9 +811,16 @@ impl Status {
             Actions::TrainedFinesse => 32,
             Actions::CarefulObservation => 0,
             Actions::HeartAndSoul => 0,
+            // 7.0
+            Actions::RefinedTouch => 24,
+            Actions::DaringTouch => 0,
+            Actions::ImmaculateMend => 112,
+            Actions::QuickInnovation => 0,
+            Actions::TrainedPerfection => 0,
             // fake actions
             Actions::RapidSynthesisFail => 0,
             Actions::HastyTouchFail => 0,
+            Actions::DaringTouchFail => 0,
             Actions::FocusedSynthesisFail => 5,
             Actions::FocusedTouchFail => 18,
         };
@@ -786,7 +844,6 @@ impl Status {
             Actions::CarefulSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 82 { 1.5 } else { 1.8 })
             }
-            Actions::FocusedSynthesis => self.cast_synthesis(10, 2.0),
             Actions::Groundwork => {
                 let mut e = if self.attributes.level < 86 { 3.0 } else { 3.6 };
                 let d = self.calc_durability(20);
@@ -798,7 +855,7 @@ impl Status {
             Actions::IntensiveSynthesis => {
                 self.cast_synthesis(10, 4.0);
                 if !matches!(self.condition, Condition::Good | Condition::Excellent) {
-                    self.buffs.heart_and_soul = 0;
+                    self.buffs.heart_and_soul = LimitedActionState::Used;
                 }
             }
             Actions::PrudentSynthesis => self.cast_synthesis(5, 1.8),
@@ -812,7 +869,10 @@ impl Status {
                 self.cast_touch(10, 1.0, 1);
                 self.buffs.touch_combo_stage = 1 + 2;
             }
-            Actions::HastyTouch => self.cast_touch(10, 1.0, 1),
+            Actions::HastyTouch => {
+                self.cast_touch(10, 1.0, 1);
+                self.buffs.hasty_touched = 2;
+            }
             Actions::StandardTouch => {
                 if self.buffs.touch_combo_stage == 1 {
                     self.buffs.touch_combo_stage = 2 + 2;
@@ -826,19 +886,21 @@ impl Status {
             }
             Actions::PreciseTouch => {
                 self.cast_touch(10, 1.5, 2);
-                if !matches!(self.condition, Condition::Good | Condition::Excellent) {
-                    self.buffs.heart_and_soul = 0;
+                if !matches!(self.condition, Condition::Good | Condition::Excellent)
+                    && matches!(self.buffs.heart_and_soul, LimitedActionState::Active)
+                {
+                    self.buffs.heart_and_soul = LimitedActionState::Used;
                 }
             }
             Actions::PrudentTouch => self.cast_touch(5, 1.0, 1),
-            Actions::FocusedTouch => self.cast_touch(10, 1.5, 1),
             Actions::PreparatoryTouch => self.cast_touch(20, 2.0, 2),
             Actions::TrainedFinesse => self.cast_touch(0, 1.0, 0),
-
             Actions::TricksOfTheTrade => {
                 self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
-                if !matches!(self.condition, Condition::Good | Condition::Excellent) {
-                    self.buffs.heart_and_soul = 0;
+                if !matches!(self.condition, Condition::Good | Condition::Excellent)
+                    && matches!(self.buffs.heart_and_soul, LimitedActionState::Active)
+                {
+                    self.buffs.heart_and_soul = LimitedActionState::Used;
                 }
             }
 
@@ -862,7 +924,7 @@ impl Status {
                 self.buffs.muscle_memory = self.new_duration_buff(5);
             }
             Actions::Reflect => {
-                self.cast_touch(10, 1.0, 2);
+                self.cast_touch(10, 3.0, 2);
             }
             Actions::TrainedEye => {
                 self.quality += self.recipe.quality;
@@ -888,13 +950,37 @@ impl Status {
                 return;
             }
             Actions::HeartAndSoul => {
-                self.buffs.heart_and_soul = 1;
-                self.buffs.heart_and_soul_used += 1;
+                self.buffs.heart_and_soul = LimitedActionState::Active;
                 return;
+            }
+            // 7.0
+            Actions::RefinedTouch => {
+                self.cast_touch(
+                    10,
+                    1.0,
+                    if self.buffs.touch_combo_stage == 1 {
+                        2
+                    } else {
+                        1
+                    },
+                );
+            }
+            Actions::DaringTouch => self.cast_touch(10, 1.5, 1),
+            Actions::ImmaculateMend => {
+                self.durability = self.recipe.durability;
+            }
+            Actions::QuickInnovation => {
+                self.buffs.innovation = 1;
+                self.buffs.quick_innovation_used += 1;
+                return;
+            }
+            Actions::TrainedPerfection => {
+                self.buffs.trained_perfection = LimitedActionState::Active;
             }
             // fake actions
             Actions::RapidSynthesisFail => self.consume_durability(10),
             Actions::HastyTouchFail => self.consume_durability(10),
+            Actions::DaringTouchFail => self.consume_durability(10),
             Actions::FocusedSynthesisFail => self.consume_durability(10),
             Actions::FocusedTouchFail => self.consume_durability(10),
         }
@@ -914,15 +1000,8 @@ impl Status {
         };
         addon
             + match action {
-                Actions::HastyTouch => 60,
+                Actions::HastyTouch | Actions::DaringTouch => 60,
                 Actions::RapidSynthesis => 50,
-                Actions::FocusedSynthesis | Actions::FocusedTouch => {
-                    if self.buffs.observed > 0 {
-                        100
-                    } else {
-                        50
-                    }
-                }
                 _ => return 100,
             }
     }
@@ -933,7 +1012,9 @@ impl Status {
             CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
             DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
             LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
-            PlayerLevelTooLow, RequireGoodOrExcellent, RequireInnerQuiet1, RequireInnerQuiet10,
+            PlayerLevelTooLow, QuickInnovationUsed, RequireGoodOrExcellent,
+            RequireHastyTouchSuccessed, RequireInnerQuiet1, RequireInnerQuiet10,
+            TrainedPerfectionUsed,
         };
 
         match action {
@@ -941,7 +1022,7 @@ impl Status {
 
             Actions::TricksOfTheTrade | Actions::IntensiveSynthesis | Actions::PreciseTouch
                 if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                    && self.buffs.heart_and_soul == 0 =>
+                    && !matches!(self.buffs.heart_and_soul, LimitedActionState::Active) =>
             {
                 Err(RequireGoodOrExcellent)
             }
@@ -964,12 +1045,26 @@ impl Status {
             Actions::CarefulObservation if self.buffs.careful_observation_used >= 3 => {
                 Err(CarefulObservationUsed3)
             }
-            Actions::HeartAndSoul if self.buffs.heart_and_soul_used >= 1 => Err(HeartAndSoulUsed),
+            Actions::HeartAndSoul
+                if matches!(self.buffs.heart_and_soul, LimitedActionState::Active) =>
+            {
+                Err(HeartAndSoulUsed)
+            }
 
             Actions::FocusedSynthesisFail | Actions::FocusedTouchFail
                 if self.buffs.observed > 0 =>
             {
                 Err(FocusNeverFailsAfterObserved)
+            }
+
+            Actions::DaringTouch if self.buffs.hasty_touched < 1 => Err(RequireHastyTouchSuccessed),
+            Actions::QuickInnovation if self.buffs.quick_innovation_used >= 1 => {
+                Err(QuickInnovationUsed)
+            }
+            Actions::TrainedPerfection
+                if !matches!(self.buffs.trained_perfection, LimitedActionState::Unused) =>
+            {
+                Err(TrainedPerfectionUsed)
             }
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
@@ -1207,598 +1302,6 @@ mod tests {
                 s.durability, step.du,
                 "step [{}] durability simulation fail: want {}, get {}",
                 i, step.du, s.durability
-            );
-            s.condition = map_cond(step.co);
-        }
-    }
-
-    #[test]
-    fn phrygian_ear_cuffs_of_healing() {
-        let attr = Attributes {
-            level: 82,
-            craftsmanship: 2786,
-            control: 2764,
-            craft_points: 533,
-        };
-        let recipe = Recipe::new(535, 100, 100, 100);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
-
-        struct Step {
-            a: i32,
-            pg: u16,
-            qu: u32,
-            du: u16,
-            co: u8,
-        }
-        for step in [
-            Step {
-                a: 100390,
-                pg: 0,
-                qu: 288,
-                du: 70,
-                co: 2,
-            },
-            Step {
-                a: 100131,
-                pg: 0,
-                qu: 1065,
-                du: 60,
-                co: 1,
-            },
-            Step {
-                a: 4577,
-                pg: 0,
-                qu: 1065,
-                du: 60,
-                co: 1,
-            },
-            Step {
-                a: 100230,
-                pg: 0,
-                qu: 1468,
-                du: 60,
-                co: 3,
-            },
-            Step {
-                a: 100302,
-                pg: 0,
-                qu: 4924,
-                du: 45,
-                co: 4,
-            },
-            Step {
-                a: 100082,
-                pg: 0,
-                qu: 4924,
-                du: 50,
-                co: 1,
-            },
-            Step {
-                a: 100246,
-                pg: 0,
-                qu: 5658,
-                du: 45,
-                co: 1,
-            },
-            Step {
-                a: 100342,
-                pg: 0,
-                qu: 6700,
-                du: 40,
-                co: 1,
-            },
-            Step {
-                a: 19300,
-                pg: 0,
-                qu: 6700,
-                du: 45,
-                co: 1,
-            },
-            Step {
-                a: 100075,
-                pg: 403,
-                qu: 6700,
-                du: 40,
-                co: 1,
-            },
-            Step {
-                a: 100075,
-                pg: 806,
-                qu: 6700,
-                du: 35,
-                co: 1,
-            },
-            Step {
-                a: 100075,
-                pg: 1209,
-                qu: 6700,
-                du: 25,
-                co: 1,
-            },
-            Step {
-                a: 100075,
-                pg: 1612,
-                qu: 6700,
-                du: 15,
-                co: 1,
-            },
-            Step {
-                a: 100077,
-                pg: 1612,
-                qu: 6700,
-                du: 45,
-                co: 1,
-            },
-            Step {
-                a: 19300,
-                pg: 1612,
-                qu: 6700,
-                du: 45,
-                co: 1,
-            },
-            Step {
-                a: 100082,
-                pg: 1612,
-                qu: 6700,
-                du: 45,
-                co: 1,
-            },
-            Step {
-                a: 100246,
-                pg: 1612,
-                qu: 6700,
-                du: 35,
-                co: 1,
-            },
-            Step {
-                a: 100082,
-                pg: 1612,
-                qu: 6700,
-                du: 35,
-                co: 1,
-            },
-            Step {
-                a: 100238,
-                pg: 2284,
-                qu: 6700,
-                du: 25,
-                co: 1,
-            },
-            Step {
-                a: 100082,
-                pg: 2284,
-                qu: 6700,
-                du: 25,
-                co: 1,
-            },
-            Step {
-                a: 100238,
-                pg: 2732,
-                qu: 6700,
-                du: 15,
-                co: 1,
-            },
-            Step {
-                a: 100082,
-                pg: 2732,
-                qu: 6700,
-                du: 15,
-                co: 1,
-            },
-            Step {
-                a: 100238,
-                pg: 3000,
-                qu: 6700,
-                du: 5,
-                co: 1,
-            },
-        ] {
-            let skill = data::action_table(step.a).unwrap();
-            s.cast_action(skill);
-            // println!("casting: {:?}", skill);
-            assert_eq!(
-                s.progress, step.pg,
-                "step [{:?}] progress simulation fail: want {}, get {}",
-                skill, step.pg, s.progress
-            );
-            assert_eq!(
-                s.quality, step.qu,
-                "step [{:?}] quality simulation fail: want {}, get {}",
-                skill, step.qu, s.quality
-            );
-            assert_eq!(
-                s.durability, step.du,
-                "step [{:?}] durability simulation fail: want {}, get {}",
-                skill, step.du, s.durability
-            );
-            s.condition = map_cond(step.co);
-        }
-    }
-
-    #[test]
-    fn resplendent() {
-        let attr = Attributes {
-            level: 82,
-            craftsmanship: 2786,
-            control: 2764,
-            craft_points: 533,
-        };
-        let recipe = Recipe::new(516, 100, 100, 86);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
-
-        struct Step {
-            a: i32,
-            pg: u16,
-            qu: u32,
-            du: u16,
-            co: u8,
-            su: bool,
-        }
-        for step in [
-            Step {
-                a: 100390,
-                pg: 0,
-                qu: 247,
-                du: 50,
-                co: 9,
-                su: true,
-            },
-            Step {
-                a: 19300,
-                pg: 0,
-                qu: 247,
-                du: 50,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 0,
-                qu: 247,
-                du: 40,
-                co: 2,
-                su: false,
-            },
-            Step {
-                a: 100318,
-                pg: 1206,
-                qu: 247,
-                du: 30,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 1206,
-                qu: 247,
-                du: 25,
-                co: 7,
-                su: false,
-            },
-            Step {
-                a: 4577,
-                pg: 1206,
-                qu: 247,
-                du: 25,
-                co: 5,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 2713,
-                qu: 247,
-                du: 20,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 2713,
-                qu: 247,
-                du: 20,
-                co: 2,
-                su: false,
-            },
-            Step {
-                a: 100131,
-                pg: 2713,
-                qu: 913,
-                du: 15,
-                co: 5,
-                su: true,
-            },
-            Step {
-                a: 100358,
-                pg: 2713,
-                qu: 913,
-                du: 10,
-                co: 6,
-                su: false,
-            },
-            Step {
-                a: 100358,
-                pg: 2713,
-                qu: 1258,
-                du: 10,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100358,
-                pg: 2713,
-                qu: 1628,
-                du: 10,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 2713,
-                qu: 1628,
-                du: 15,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100246,
-                pg: 2713,
-                qu: 2220,
-                du: 10,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100374,
-                pg: 2713,
-                qu: 2220,
-                du: 10,
-                co: 8,
-                su: true,
-            },
-            Step {
-                a: 100077,
-                pg: 2713,
-                qu: 2220,
-                du: 40,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 3718,
-                qu: 2220,
-                du: 35,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100131,
-                pg: 3718,
-                qu: 3164,
-                du: 25,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100131,
-                pg: 3718,
-                qu: 4219,
-                du: 15,
-                co: 7,
-                su: true,
-            },
-            Step {
-                a: 100077,
-                pg: 3718,
-                qu: 4219,
-                du: 45,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100366,
-                pg: 3718,
-                qu: 4219,
-                du: 35,
-                co: 1,
-                su: false,
-            },
-            Step {
-                a: 100366,
-                pg: 4723,
-                qu: 4219,
-                du: 25,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100374,
-                pg: 4723,
-                qu: 4219,
-                du: 25,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100358,
-                pg: 4723,
-                qu: 4219,
-                du: 20,
-                co: 1,
-                su: false,
-            },
-            Step {
-                a: 19007,
-                pg: 4723,
-                qu: 4219,
-                du: 20,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 4723,
-                qu: 4219,
-                du: 20,
-                co: 7,
-                su: true,
-            },
-            Step {
-                a: 100246,
-                pg: 4723,
-                qu: 5330,
-                du: 10,
-                co: 9,
-                su: true,
-            },
-            Step {
-                a: 100077,
-                pg: 4723,
-                qu: 5330,
-                du: 40,
-                co: 5,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 4723,
-                qu: 5330,
-                du: 40,
-                co: 6,
-                su: true,
-            },
-            Step {
-                a: 100246,
-                pg: 4723,
-                qu: 6071,
-                du: 35,
-                co: 8,
-                su: true,
-            },
-            Step {
-                a: 100075,
-                pg: 5084,
-                qu: 6071,
-                du: 25,
-                co: 8,
-                su: true,
-            },
-            Step {
-                a: 100075,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100374,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 2,
-                su: true,
-            },
-            Step {
-                a: 100374,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 9,
-                su: true,
-            },
-            Step {
-                a: 263,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 9,
-                su: true,
-            },
-            Step {
-                a: 19007,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 5,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 5445,
-                qu: 6071,
-                du: 15,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100246,
-                pg: 5445,
-                qu: 7923,
-                du: 5,
-                co: 8,
-                su: true,
-            },
-            Step {
-                a: 100077,
-                pg: 5445,
-                qu: 7923,
-                du: 35,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 5445,
-                qu: 7923,
-                du: 35,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100082,
-                pg: 5445,
-                qu: 7923,
-                du: 35,
-                co: 1,
-                su: true,
-            },
-            Step {
-                a: 100075,
-                pg: 5470,
-                qu: 7923,
-                du: 25,
-                co: 1,
-                su: true,
-            },
-        ] {
-            let skill = data::action_table(step.a).unwrap();
-            // println!("casting: {:?} {}", skill,  s.craft_points);
-            if step.su {
-                s.cast_action(skill);
-            } else {
-                s.cast_action(match skill {
-                    Actions::RapidSynthesis => Actions::RapidSynthesisFail,
-                    Actions::HastyTouch => Actions::HastyTouchFail,
-                    Actions::FocusedSynthesis => Actions::FocusedSynthesisFail,
-                    Actions::FocusedTouch => Actions::FocusedTouchFail,
-                    _ => unreachable!(),
-                })
-            }
-            assert_eq!(
-                s.progress, step.pg,
-                "step [{:?}] progress simulation fail: want {}, get {}",
-                skill, step.pg, s.progress
-            );
-            assert_eq!(
-                s.quality, step.qu,
-                "step [{:?}] quality simulation fail: want {}, get {}",
-                skill, step.qu, s.quality
-            );
-            assert_eq!(
-                s.durability, step.du,
-                "step [{:?}] durability simulation fail: want {}, get {}",
-                skill, step.du, s.durability
             );
             s.condition = map_cond(step.co);
         }
