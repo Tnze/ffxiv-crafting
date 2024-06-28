@@ -489,7 +489,7 @@ pub struct Buffs {
     pub observed: u8,
     /// 仓促成功
     /// 假想buff，用于处理 仓促-DaringTouch连击
-    pub hasty_touched: u8,
+    pub daring_touch_prepared: u8,
 }
 
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
@@ -556,7 +556,7 @@ impl Buffs {
         self.wast_not = self.wast_not.saturating_sub(1);
         self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
         self.observed = self.observed.saturating_sub(1);
-        self.hasty_touched = self.hasty_touched.saturating_sub(1);
+        self.daring_touch_prepared = self.daring_touch_prepared.saturating_sub(1);
     }
 }
 
@@ -651,8 +651,10 @@ pub enum CastActionError {
     FocusNeverFailsAfterObserved,
     /// 必须在仓促成功后使用
     RequireHastyTouchSuccessed,
-    /// Quick改革一次制作只能使用一次
+    /// 快速改革一次制作只能使用一次
     QuickInnovationUsed,
+    /// 改革状态下无法发动快速改革
+    NotAllowedInInnovationBuff,
     /// 工匠的绝技一次制作只能使用一次
     TrainedPerfectionUsed,
 }
@@ -675,6 +677,7 @@ impl Display for CastActionError {
             CastActionError::FocusNeverFailsAfterObserved => "focus never fails after observed",
             CastActionError::RequireHastyTouchSuccessed => "require hasty touch successed first",
             CastActionError::QuickInnovationUsed => "quick innovation can be only used once",
+            CastActionError::NotAllowedInInnovationBuff => "not allowed in innovation buff",
             CastActionError::TrainedPerfectionUsed => "trained perfection can be only used once",
         })
     }
@@ -871,7 +874,7 @@ impl Status {
             }
             Actions::HastyTouch => {
                 self.cast_touch(10, 1.0, 1);
-                self.buffs.hasty_touched = 2;
+                self.buffs.daring_touch_prepared = 2;
             }
             Actions::StandardTouch => {
                 if self.buffs.touch_combo_stage == 1 {
@@ -970,7 +973,9 @@ impl Status {
                 self.durability = self.recipe.durability;
             }
             Actions::QuickInnovation => {
-                self.buffs.innovation = 1;
+                if self.buffs.innovation < 1 {
+                    self.buffs.innovation = 1;
+                }
                 self.buffs.quick_innovation_used += 1;
                 return;
             }
@@ -1011,8 +1016,8 @@ impl Status {
         use CastActionError::{
             CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
             DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
-            LevelGapMustGreaterThanTen, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
-            PlayerLevelTooLow, QuickInnovationUsed, RequireGoodOrExcellent,
+            LevelGapMustGreaterThanTen, NotAllowedInInnovationBuff, NotAllowedInWastNotBuff,
+            OnlyAllowedInFirstStep, PlayerLevelTooLow, QuickInnovationUsed, RequireGoodOrExcellent,
             RequireHastyTouchSuccessed, RequireInnerQuiet1, RequireInnerQuiet10,
             TrainedPerfectionUsed,
         };
@@ -1057,9 +1062,14 @@ impl Status {
                 Err(FocusNeverFailsAfterObserved)
             }
 
-            Actions::DaringTouch if self.buffs.hasty_touched < 1 => Err(RequireHastyTouchSuccessed),
+            Actions::DaringTouch if self.buffs.daring_touch_prepared < 1 => {
+                Err(RequireHastyTouchSuccessed)
+            }
             Actions::QuickInnovation if self.buffs.quick_innovation_used >= 1 => {
                 Err(QuickInnovationUsed)
+            }
+            Actions::QuickInnovation if self.buffs.innovation > 0 => {
+                Err(NotAllowedInInnovationBuff)
             }
             Actions::TrainedPerfection
                 if !matches!(self.buffs.trained_perfection, LimitedActionState::Unused) =>
