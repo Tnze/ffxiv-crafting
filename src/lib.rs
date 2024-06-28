@@ -40,15 +40,13 @@ pub enum Actions {
     CarefulSynthesis,
     Manipulation,
     PrudentTouch,
-    // FocusedSynthesis,
-    // FocusedTouch,
+    AdvancedTouch,
     Reflect,
     PreparatoryTouch,
     Groundwork,
     DelicateSynthesis,
     IntensiveSynthesis,
     TrainedEye,
-    AdvancedTouch,
     PrudentSynthesis,
     TrainedFinesse,
     CarefulObservation,
@@ -56,8 +54,8 @@ pub enum Actions {
     // 7.0
     RefinedTouch,
     DaringTouch,
-    ImmaculateMend,
     QuickInnovation,
+    ImmaculateMend,
     TrainedPerfection,
     // fake actions
     RapidSynthesisFail,
@@ -128,13 +126,13 @@ impl Actions {
             Actions::CarefulSynthesis => 62,
             Actions::Manipulation => 65,
             Actions::PrudentTouch => 66,
+            Actions::AdvancedTouch => 68,
             Actions::Reflect => 69,
             Actions::PreparatoryTouch => 71,
             Actions::Groundwork => 72,
             Actions::DelicateSynthesis => 76,
             Actions::IntensiveSynthesis => 78,
             Actions::TrainedEye => 80,
-            Actions::AdvancedTouch => 84,
             Actions::PrudentSynthesis => 88,
             Actions::TrainedFinesse => 90,
             Actions::CarefulObservation => 55,
@@ -142,8 +140,8 @@ impl Actions {
             // 7.0
             Actions::RefinedTouch => 92,
             Actions::DaringTouch => 96,
-            Actions::ImmaculateMend => 98,
             Actions::QuickInnovation => 96,
+            Actions::ImmaculateMend => 98,
             Actions::TrainedPerfection => 100,
             // fake actions
             Actions::RapidSynthesisFail => 9,
@@ -178,13 +176,13 @@ impl From<&Actions> for &str {
             Actions::CarefulSynthesis => "careful_synthesis",
             Actions::Manipulation => "manipulation",
             Actions::PrudentTouch => "prudent_touch",
+            Actions::AdvancedTouch => "advanced_touch",
             Actions::Reflect => "reflect",
             Actions::PreparatoryTouch => "preparatory_touch",
             Actions::Groundwork => "groundwork",
             Actions::DelicateSynthesis => "delicate_synthesis",
             Actions::IntensiveSynthesis => "intensive_synthesis",
             Actions::TrainedEye => "trained_eye",
-            Actions::AdvancedTouch => "advanced_touch",
             Actions::PrudentSynthesis => "prudent_synthesis",
             Actions::TrainedFinesse => "trained_finesse",
             Actions::CarefulObservation => "careful_observation",
@@ -192,8 +190,8 @@ impl From<&Actions> for &str {
             // 7.0
             Actions::RefinedTouch => "refined_touch",
             Actions::DaringTouch => "daring_touch",
-            Actions::ImmaculateMend => "immaculate_mend",
             Actions::QuickInnovation => "quick_innovation",
+            Actions::ImmaculateMend => "immaculate_mend",
             Actions::TrainedPerfection => "trained_perfection",
             // fake actions
             Actions::RapidSynthesisFail => "rapid_synthsis_fail",
@@ -230,13 +228,13 @@ impl TryFrom<&str> for Actions {
             "careful_synthesis" | "模范制作" => Actions::CarefulSynthesis,
             "manipulation" | "掌握" => Actions::Manipulation,
             "prudent_touch" | "俭约加工" => Actions::PrudentTouch,
+            "advanced_touch" | "上级加工" => Actions::AdvancedTouch,
             "reflect" | "闲静" => Actions::Reflect,
             "preparatory_touch" | "坯料加工" => Actions::PreparatoryTouch,
             "groundwork" | "坯料制作" => Actions::Groundwork,
             "delicate_synthesis" | "精密制作" => Actions::DelicateSynthesis,
             "intensive_synthesis" | "集中制作" => Actions::IntensiveSynthesis,
             "trained_eye" | "工匠的神速技巧" => Actions::TrainedEye,
-            "advanced_touch" | "上级加工" => Actions::AdvancedTouch,
             "prudent_synthesis" | "俭约制作" => Actions::PrudentSynthesis,
             "trained_finesse" | "工匠的神技" => Actions::TrainedFinesse,
             "careful_observation" | "设计变动" => Actions::CarefulObservation,
@@ -244,8 +242,8 @@ impl TryFrom<&str> for Actions {
             // 7.0
             "refined_touch" => Actions::RefinedTouch,
             "daring_touch" => Actions::DaringTouch,
-            "immaculate_mend" => Actions::ImmaculateMend,
             "quick_innovation" => Actions::QuickInnovation,
+            "immaculate_mend" => Actions::ImmaculateMend,
             "trained_perfection" => Actions::TrainedPerfection,
             // fake actions
             "rapid_synthesis_fail" => Actions::RapidSynthesisFail,
@@ -797,12 +795,6 @@ impl Status {
             Actions::CarefulSynthesis => 7,
             Actions::Manipulation => 96,
             Actions::PrudentTouch => 25,
-            Actions::Reflect => 6,
-            Actions::PreparatoryTouch => 40,
-            Actions::Groundwork => 18,
-            Actions::DelicateSynthesis => 32,
-            Actions::IntensiveSynthesis => 6,
-            Actions::TrainedEye => 250,
             Actions::AdvancedTouch => {
                 if self.buffs.touch_combo_stage == 2 || self.buffs.observed > 0 {
                     18
@@ -810,6 +802,12 @@ impl Status {
                     46
                 }
             }
+            Actions::Reflect => 6,
+            Actions::PreparatoryTouch => 40,
+            Actions::Groundwork => 18,
+            Actions::DelicateSynthesis => 32,
+            Actions::IntensiveSynthesis => 6,
+            Actions::TrainedEye => 250,
             Actions::PrudentSynthesis => 18,
             Actions::TrainedFinesse => 32,
             Actions::CarefulObservation => 0,
@@ -864,7 +862,7 @@ impl Status {
             Actions::PrudentSynthesis => self.cast_synthesis(5, 1.8),
 
             Actions::DelicateSynthesis => {
-                self.cast_synthesis(0, 1.0);
+                self.cast_synthesis(0, if self.attributes.level < 94 { 1.0 } else { 1.5 });
                 self.cast_touch(10, 1.0, 1);
             }
 
@@ -969,15 +967,15 @@ impl Status {
                 );
             }
             Actions::DaringTouch => self.cast_touch(10, 1.5, 1),
-            Actions::ImmaculateMend => {
-                self.durability = self.recipe.durability;
-            }
             Actions::QuickInnovation => {
                 if self.buffs.innovation < 1 {
                     self.buffs.innovation = 1;
                 }
                 self.buffs.quick_innovation_used += 1;
                 return;
+            }
+            Actions::ImmaculateMend => {
+                self.durability = self.recipe.durability;
             }
             Actions::TrainedPerfection => {
                 self.buffs.trained_perfection = LimitedActionState::Active;
