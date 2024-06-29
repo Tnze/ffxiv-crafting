@@ -658,7 +658,6 @@ pub fn recipe_level_table(rlv: i32) -> RecipeLevel {
         class_job_level: a.0,
         stars: a.1,
         suggested_craftsmanship: a.2,
-        suggested_control: a.3,
         difficulty: a.4,
         quality: a.5,
         progress_divider: a.6,

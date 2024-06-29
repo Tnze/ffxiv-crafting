@@ -421,7 +421,6 @@ pub struct RecipeLevel {
     pub class_job_level: u8,
     pub stars: u8,
     pub suggested_craftsmanship: u16,
-    pub suggested_control: u16,
     pub difficulty: u16,
     pub quality: u32,
     pub progress_divider: u8,
