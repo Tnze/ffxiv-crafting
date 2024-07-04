@@ -470,6 +470,8 @@ pub struct Buffs {
     pub manipulation: u8,
     /// 俭约 OR 长期俭约
     pub wast_not: u8,
+    /// 匠の好機
+    pub expedience: u8,
     /// 专心致志
     pub heart_and_soul: LimitedActionState,
     /// 工匠的绝技
@@ -484,9 +486,6 @@ pub struct Buffs {
     /// 观察（注视预备）
     /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
     pub observed: u8,
-    /// 仓促成功
-    /// 假想buff，用于处理 仓促-DaringTouch连击
-    pub daring_touch_prepared: u8,
 }
 
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
@@ -553,7 +552,7 @@ impl Buffs {
         self.wast_not = self.wast_not.saturating_sub(1);
         self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
         self.observed = self.observed.saturating_sub(1);
-        self.daring_touch_prepared = self.daring_touch_prepared.saturating_sub(1);
+        self.expedience = self.expedience.saturating_sub(1);
     }
 }
 
@@ -871,7 +870,7 @@ impl Status {
             }
             Actions::HastyTouch => {
                 self.cast_touch(10, 1.0, 1);
-                self.buffs.daring_touch_prepared = 2;
+                self.buffs.expedience = 2;
             }
             Actions::StandardTouch => {
                 if self.buffs.touch_combo_stage == 1 {
@@ -1059,9 +1058,7 @@ impl Status {
                 Err(FocusNeverFailsAfterObserved)
             }
 
-            Actions::DaringTouch if self.buffs.daring_touch_prepared < 1 => {
-                Err(RequireHastyTouchSuccessed)
-            }
+            Actions::DaringTouch if self.buffs.expedience < 1 => Err(RequireHastyTouchSuccessed),
             Actions::QuickInnovation if self.buffs.quick_innovation_used >= 1 => {
                 Err(QuickInnovationUsed)
             }
