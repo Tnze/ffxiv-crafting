@@ -705,6 +705,9 @@ impl Status {
         if self.buffs.wast_not > 0 {
             reduce -= reduce / 2;
         }
+        if let LimitedActionState::Active = self.buffs.trained_perfection {
+            reduce = 0;
+        }
         reduce
     }
 
