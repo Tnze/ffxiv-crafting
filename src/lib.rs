@@ -1050,7 +1050,7 @@ impl Status {
                 Err(CarefulObservationUsed3)
             }
             Actions::HeartAndSoul
-                if matches!(self.buffs.heart_and_soul, LimitedActionState::Active) =>
+                if !matches!(self.buffs.heart_and_soul, LimitedActionState::Unused) =>
             {
                 Err(HeartAndSoulUsed)
             }
