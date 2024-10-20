@@ -550,9 +550,13 @@ impl Buffs {
         self.final_appraisal = self.final_appraisal.saturating_sub(1);
         self.manipulation = self.manipulation.saturating_sub(1);
         self.wast_not = self.wast_not.saturating_sub(1);
+        self.expedience = self.expedience.saturating_sub(1);
+        self.next_combo();
+    }
+
+    pub(crate) fn next_combo(&mut self) {
         self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
         self.observed = self.observed.saturating_sub(1);
-        self.expedience = self.expedience.saturating_sub(1);
     }
 }
 
@@ -945,14 +949,17 @@ impl Status {
             }
             Actions::FinalAppraisal => {
                 self.buffs.final_appraisal = 5;
+                self.buffs.next_combo();
                 return;
             }
             Actions::CarefulObservation => {
                 self.buffs.careful_observation_used += 1;
+                self.buffs.next_combo();
                 return;
             }
             Actions::HeartAndSoul => {
                 self.buffs.heart_and_soul = LimitedActionState::Active;
+                self.buffs.next_combo();
                 return;
             }
             // 7.0
@@ -973,6 +980,7 @@ impl Status {
                     self.buffs.innovation = 1;
                 }
                 self.buffs.quick_innovation_used += 1;
+                self.buffs.next_combo();
                 return;
             }
             Actions::ImmaculateMend => {
