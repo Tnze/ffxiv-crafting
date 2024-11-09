@@ -716,6 +716,9 @@ impl Status {
     }
 
     fn consume_durability(&mut self, durability: u16) {
+        if durability == 0 {
+            return;
+        }
         if let LimitedActionState::Active = self.buffs.trained_perfection {
             self.buffs.trained_perfection = LimitedActionState::Used;
             return;
