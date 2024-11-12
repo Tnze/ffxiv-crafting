@@ -375,7 +375,7 @@ pub struct Attributes {
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Recipe {
     /// 配方等级
-    pub rlv: i32,
+    pub rlv: RecipeLevel,
 
     /// 制作配方所需的玩家等级
     pub job_level: u8,
@@ -418,6 +418,7 @@ pub struct Recipe {
 #[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct RecipeLevel {
+    pub id: i32,
     pub class_job_level: u8,
     pub stars: u8,
     pub suggested_craftsmanship: u16,
@@ -433,19 +434,18 @@ pub struct RecipeLevel {
 
 impl Recipe {
     pub fn new(
-        rlv: i32,
+        rlv: RecipeLevel,
         difficulty_factor: u16,
         quality_factor: u16,
         durability_factor: u16,
     ) -> Self {
-        let rt = data::recipe_level_table(rlv);
         Self {
             rlv,
-            job_level: rt.class_job_level,
-            difficulty: (rt.difficulty as u32 * difficulty_factor as u32 / 100) as u16,
-            quality: rt.quality * quality_factor as u32 / 100,
-            durability: rt.durability * durability_factor / 100,
-            conditions_flag: rt.conditions_flag,
+            job_level: rlv.class_job_level,
+            difficulty: (rlv.difficulty as u32 * difficulty_factor as u32 / 100) as u16,
+            quality: rlv.quality * quality_factor as u32 / 100,
+            durability: rlv.durability * durability_factor / 100,
+            conditions_flag: rlv.conditions_flag,
         }
     }
 }
@@ -598,7 +598,8 @@ pub struct Caches {
 }
 
 impl Caches {
-    pub fn new(attributes: &Attributes, recipe: &Recipe, rlv: &RecipeLevel) -> Self {
+    pub fn new(attributes: &Attributes, recipe: &Recipe) -> Self {
+        let rlv = &recipe.rlv;
         Self {
             base_synth: {
                 let mut base =
@@ -686,10 +687,10 @@ impl Display for CastActionError {
 impl Error for CastActionError {}
 
 impl Status {
-    pub fn new(attributes: Attributes, recipe: Recipe, rlv: RecipeLevel) -> Self {
+    pub fn new(attributes: Attributes, recipe: Recipe) -> Self {
         Status {
             buffs: Buffs::default(),
-            caches: Caches::new(&attributes, &recipe, &rlv),
+            caches: Caches::new(&attributes, &recipe),
             attributes,
             recipe,
             durability: recipe.durability,
@@ -1216,8 +1217,9 @@ mod tests {
             control: 2784,
             craft_points: 548,
         };
-        let recipe = Recipe::new(517, 50, 100, 50);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let rlv = data::recipe_level_table(517);
+        let recipe = Recipe::new(rlv, 50, 100, 50);
+        let mut s = Status::new(attr, recipe);
 
         let result = [279, 558, 837, 1000];
         for &pg in &result {
@@ -1234,8 +1236,9 @@ mod tests {
             control: 2794,
             craft_points: 539,
         };
-        let recipe = Recipe::new(517, 100, 100, 100);
-        let mut s = Status::new(attr, recipe, data::recipe_level_table(recipe.rlv));
+        let rlv = data::recipe_level_table(517);
+        let recipe = Recipe::new(rlv, 100, 100, 100);
+        let mut s = Status::new(attr, recipe);
 
         struct Step {
             a: Actions,
@@ -1343,14 +1346,15 @@ mod tests {
     #[allow(unused_must_use)]
     #[bench]
     fn simple_benchmark(b: &mut Bencher) {
-        let recipe = Recipe::new(580, 100, 140, 100);
+        let rlv = data::recipe_level_table(580);
+        let recipe = Recipe::new(rlv, 100, 140, 100);
         let player = Attributes {
             level: 90,
             craftsmanship: 3293,
             control: 3524,
             craft_points: 626,
         };
-        let s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        let s = Status::new(player, recipe);
         let actions = [
             Actions::MuscleMemory,
             Actions::Manipulation,
@@ -1387,7 +1391,7 @@ mod tests {
     #[test]
     fn test1() {
         let recipe = Recipe {
-            rlv: 590,
+            rlv: data::recipe_level_table(590),
             job_level: 90,
             difficulty: 4300,
             quality: 12800,
@@ -1400,7 +1404,7 @@ mod tests {
             control: 3340,
             craft_points: 654,
         };
-        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(player, recipe);
         let actions = vec![
             Actions::MuscleMemory,
             Actions::Manipulation,
@@ -1425,7 +1429,7 @@ mod tests {
     #[test]
     fn test2() {
         let recipe = Recipe {
-            rlv: 640,
+            rlv: data::recipe_level_table(640),
             job_level: 90,
             difficulty: 6600,
             quality: 14040,
@@ -1438,7 +1442,7 @@ mod tests {
             control: 4005,
             craft_points: 594,
         };
-        let mut s = Status::new(player, recipe, data::recipe_level_table(recipe.rlv));
+        let mut s = Status::new(player, recipe);
         s.cast_action(Actions::Veneration);
         s.cast_action(Actions::Groundwork);
         assert_eq!(s.progress, 1350);

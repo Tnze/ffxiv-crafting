@@ -845,6 +845,7 @@ pub fn recipe_level_table(rlv: i32) -> RecipeLevel {
         _ => (0, 0, 10000, 100, 100, 50, 30, 100, 100, 100, 15),
     };
     RecipeLevel {
+        id: rlv,
         class_job_level: a.0,
         stars: a.1,
         suggested_craftsmanship: a.2,
