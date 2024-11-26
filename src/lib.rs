@@ -938,6 +938,7 @@ impl Status {
             }
             Actions::TrainedEye => {
                 self.quality += self.recipe.quality;
+                self.buffs.inner_quiet = self.buffs.inner_quiet.saturating_add_signed(1).min(10);
             }
             Actions::Veneration => {
                 self.buffs.veneration = self.new_duration_buff(4);
