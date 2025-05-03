@@ -1,6 +1,6 @@
 [package]
 name = "ffxiv-crafting"
-version = "7.1.2"
+version = "7.2.0"
 edition = "2021"
 authors = ["Tnze <cjd001113@outlook.com>"]
 description = "A crafting simulator of FFXIV."

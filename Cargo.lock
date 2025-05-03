@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "ffxiv-crafting"
-version = "7.1.2"
+version = "7.2.0"
 dependencies = [
  "serde",
 ]

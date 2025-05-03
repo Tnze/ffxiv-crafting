@@ -2,8 +2,8 @@
 
 A crafting simulator of FFXIV.
 
-https://crates.io/crates/ffxiv-crafting  
-https://ngabbs.com/read.php?&tid=29796644
+<https://crates.io/crates/ffxiv-crafting>
+<https://ngabbs.com/read.php?&tid=29796644>
 
 ---
 
@@ -29,4 +29,4 @@ https://ngabbs.com/read.php?&tid=29796644
 
 ### 适配版本
 
-7.X
+7.2X
