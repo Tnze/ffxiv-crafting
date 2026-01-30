@@ -953,7 +953,7 @@ impl Status {
                 self.buffs.observed = 2;
             }
             Actions::FinalAppraisal => {
-                self.buffs.final_appraisal = 5;
+                self.buffs.final_appraisal = self.new_duration_buff(5);
                 self.buffs.next_combo();
                 return;
             }
@@ -981,9 +981,7 @@ impl Status {
             }
             Actions::DaringTouch => self.cast_touch(10, 1.5, 1),
             Actions::QuickInnovation => {
-                if self.buffs.innovation < 1 {
-                    self.buffs.innovation = 1;
-                }
+                self.buffs.innovation = self.new_duration_buff(1);
                 self.buffs.quick_innovation_used += 1;
                 self.buffs.next_combo();
                 return;
