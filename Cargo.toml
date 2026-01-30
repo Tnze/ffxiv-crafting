@@ -1,8 +1,8 @@
 [package]
 name = "ffxiv-crafting"
-version = "7.2.0"
+version = "7.4.1"
 edition = "2021"
-authors = ["Tnze <cjd001113@outlook.com>"]
+authors = ["Tnze <Tnze@tnze.tech>"]
 description = "A crafting simulator of FFXIV."
 readme = "README.md"
 repository = "https://github.com/Tnze/ffxiv-crafting"

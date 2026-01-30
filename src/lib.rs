@@ -289,7 +289,7 @@ pub enum Condition {
 
     /// 黄：成功率增加 25%
     Centered,
-    /// 蓝：耐久消耗降低 50%, 效果可与俭约叠加
+    /// 蓝（结实）：耐久消耗降低 50%, 效果可与俭约叠加
     Sturdy,
     /// 绿：CP 消耗减少 50%
     Pliant,
@@ -299,6 +299,8 @@ pub enum Condition {
     Primed,
     /// 粉：下一回合必定是红球
     GoodOmen,
+    /// 强韧：耐久消耗减半，下个工次必定出现结实状态。
+    Robust,
 }
 
 impl From<&Condition> for &str {
@@ -1150,7 +1152,8 @@ impl ConditionIterator {
             Condition::Pliant => Some(Condition::Malleable),
             Condition::Malleable => Some(Condition::Primed),
             Condition::Primed => Some(Condition::GoodOmen),
-            Condition::GoodOmen => None,
+            Condition::GoodOmen => Some(Condition::Robust),
+            Condition::Robust => None,
         }
     }
 }
@@ -1175,15 +1178,16 @@ impl Iterator for ConditionIterator {
         self.step = Self::next_cond(cond);
         let expert = self.flag & (1 << Condition::Excellent as i32) == 0;
         let rate = match cond {
-            Condition::Good => [self.good_chance, 0.12][expert as usize],
+            Condition::Good => [self.good_chance, 0.1][expert as usize],
             Condition::Excellent => [0.04, 0.0][expert as usize],
             Condition::Poor => 0.0,
-            Condition::Centered => 0.15,
-            Condition::Sturdy => 0.15,
-            Condition::Pliant => 0.12,
-            Condition::Malleable => 0.12,
-            Condition::Primed => 0.12,
-            Condition::GoodOmen => 0.12,
+            Condition::Centered => 0.1,
+            Condition::Sturdy => 0.1,
+            Condition::Pliant => 0.1,
+            Condition::Malleable => 0.1,
+            Condition::Primed => 0.1,
+            Condition::GoodOmen => 0.1,
+            Condition::Robust => 0.1,
             Condition::Normal => 1.0 - self.rate,
         };
         self.rate += rate;
