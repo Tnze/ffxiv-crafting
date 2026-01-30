@@ -316,6 +316,7 @@ impl From<&Condition> for &str {
             Condition::Malleable => "malleable",
             Condition::Primed => "primed",
             Condition::GoodOmen => "good_omen",
+            Condition::Robust => "robust",
         }
     }
 }
@@ -335,6 +336,7 @@ impl TryFrom<&str> for Condition {
             "malleable" => Condition::Malleable,
             "primed" => Condition::Primed,
             "good_omen" => Condition::GoodOmen,
+            "robust" => Condition::Robust,
             _ => return Err(()),
         })
     }
