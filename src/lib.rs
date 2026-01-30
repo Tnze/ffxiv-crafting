@@ -708,7 +708,7 @@ impl Status {
 
     pub fn calc_durability(&self, durability: u16) -> u16 {
         let mut reduce = durability;
-        if let Condition::Sturdy = self.condition {
+        if matches!(self.condition, Condition::Sturdy | Condition::Robust) {
             reduce -= reduce / 2;
         }
         if self.buffs.wast_not > 0 {
