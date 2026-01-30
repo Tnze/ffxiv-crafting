@@ -922,13 +922,13 @@ impl Status {
                 self.durability = self.recipe.durability.min(self.durability + 30);
             }
             Actions::WasteNot => {
-                self.buffs.wast_not = self.new_duration_buff(4);
+                self.buffs.wast_not = self.buffs.wast_not.max(self.new_duration_buff(4));
             }
             Actions::WasteNotII => {
-                self.buffs.wast_not = self.new_duration_buff(8);
+                self.buffs.wast_not = self.buffs.wast_not.max(self.new_duration_buff(8));
             }
             Actions::Manipulation => {
-                self.buffs.manipulation = self.new_duration_buff(8);
+                self.buffs.manipulation = self.buffs.manipulation.max(self.new_duration_buff(8));
                 self.buffs.next();
                 self.step += 1;
                 return;
@@ -945,19 +945,22 @@ impl Status {
                 self.buffs.inner_quiet = self.buffs.inner_quiet.saturating_add_signed(1).min(10);
             }
             Actions::Veneration => {
-                self.buffs.veneration = self.new_duration_buff(4);
+                self.buffs.veneration = self.buffs.veneration.max(self.new_duration_buff(4));
             }
             Actions::GreatStrides => {
-                self.buffs.great_strides = self.new_duration_buff(3);
+                self.buffs.great_strides = self.buffs.great_strides.max(self.new_duration_buff(3));
             }
             Actions::Innovation => {
-                self.buffs.innovation = self.new_duration_buff(4);
+                self.buffs.innovation = self.buffs.innovation.max(self.new_duration_buff(4));
             }
             Actions::Observe => {
                 self.buffs.observed = 2;
             }
             Actions::FinalAppraisal => {
-                self.buffs.final_appraisal = self.new_duration_buff(5);
+                self.buffs.final_appraisal = self
+                    .buffs
+                    .final_appraisal
+                    .max(self.new_duration_buff(5) - 1);
                 self.buffs.next_combo();
                 return;
             }
@@ -985,7 +988,7 @@ impl Status {
             }
             Actions::DaringTouch => self.cast_touch(10, 1.5, 1),
             Actions::QuickInnovation => {
-                self.buffs.innovation = self.new_duration_buff(1);
+                self.buffs.innovation = self.buffs.innovation.max(self.new_duration_buff(1) - 1);
                 self.buffs.quick_innovation_used += 1;
                 self.buffs.next_combo();
                 return;
