@@ -472,8 +472,10 @@ pub struct Buffs {
     pub final_appraisal: u8,
     /// 掌握
     pub manipulation: u8,
-    /// 俭约 OR 长期俭约
+    /// 俭约
     pub wast_not: u8,
+    /// 长期俭约
+    pub wast_not_ii: u8,
     /// 匠の好機
     pub expedience: u8,
     /// 专心致志
@@ -554,6 +556,7 @@ impl Buffs {
         self.final_appraisal = self.final_appraisal.saturating_sub(1);
         self.manipulation = self.manipulation.saturating_sub(1);
         self.wast_not = self.wast_not.saturating_sub(1);
+        self.wast_not_ii = self.wast_not_ii.saturating_sub(1);
         self.expedience = self.expedience.saturating_sub(1);
         self.next_combo();
     }
@@ -711,7 +714,7 @@ impl Status {
         if matches!(self.condition, Condition::Sturdy | Condition::Robust) {
             reduce -= reduce / 2;
         }
-        if self.buffs.wast_not > 0 {
+        if self.buffs.wast_not > 0 || self.buffs.wast_not_ii > 0 {
             reduce -= reduce / 2;
         }
         if let LimitedActionState::Active = self.buffs.trained_perfection {
@@ -922,10 +925,12 @@ impl Status {
                 self.durability = self.recipe.durability.min(self.durability + 30);
             }
             Actions::WasteNot => {
+                self.buffs.wast_not_ii = 0;
                 self.buffs.wast_not = self.buffs.wast_not.max(self.new_duration_buff(4));
             }
             Actions::WasteNotII => {
-                self.buffs.wast_not = self.buffs.wast_not.max(self.new_duration_buff(8));
+                self.buffs.wast_not = 0;
+                self.buffs.wast_not_ii = self.buffs.wast_not_ii.max(self.new_duration_buff(8));
             }
             Actions::Manipulation => {
                 self.buffs.manipulation = self.buffs.manipulation.max(self.new_duration_buff(8));
@@ -1454,5 +1459,34 @@ mod tests {
         s.cast_action(Actions::Veneration);
         s.cast_action(Actions::Groundwork);
         assert_eq!(s.progress, 1350);
+    }
+
+    #[test]
+    fn wast_not_overrides() {
+        let recipe = Recipe {
+            rlv: data::recipe_level_table(770),
+            job_level: 100,
+            difficulty: 10040,
+            quality: 21200,
+            durability: 70,
+            conditions_flag: 15,
+        };
+        let player = Attributes {
+            level: 100,
+            craftsmanship: 5668,
+            control: 5290,
+            craft_points: 615,
+        };
+        let mut s = Status::new(player, recipe);
+        s.cast_action(Actions::WasteNotII);
+        s.cast_action(Actions::WasteNot); // wast not: 4, durability: 70
+        s.cast_action(Actions::Groundwork); // wast not: 3, durability: 60
+        s.cast_action(Actions::Groundwork); // wast not: 2, durability: 50
+        s.cast_action(Actions::Groundwork); // wast not: 1, durability: 40
+        s.cast_action(Actions::Groundwork); // wast not: 0, durability: 30
+
+        s.cast_action(Actions::Groundwork); // wast not: 0, durability: 10
+        s.cast_action(Actions::BasicSynthesis); // wast not: 0, durability: 0
+        assert!(s.is_finished())
     }
 }
