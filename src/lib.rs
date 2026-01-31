@@ -1054,7 +1054,9 @@ impl Status {
                 Err(RequireGoodOrExcellent)
             }
 
-            Actions::PrudentTouch | Actions::PrudentSynthesis if self.buffs.wast_not > 0 => {
+            Actions::PrudentTouch | Actions::PrudentSynthesis
+                if self.buffs.wast_not > 0 || self.buffs.wast_not_ii > 0 =>
+            {
                 Err(NotAllowedInWastNotBuff)
             }
 
