@@ -57,12 +57,12 @@ pub enum Actions {
     QuickInnovation,
     ImmaculateMend,
     TrainedPerfection,
+    // 7.4
+    StellarSteadyHand,
     // fake actions
     RapidSynthesisFail,
     HastyTouchFail,
     DaringTouchFail,
-    FocusedSynthesisFail,
-    FocusedTouchFail,
 }
 
 #[deprecated]
@@ -143,12 +143,12 @@ impl Actions {
             Actions::QuickInnovation => 96,
             Actions::ImmaculateMend => 98,
             Actions::TrainedPerfection => 100,
+            // 7.4
+            Actions::StellarSteadyHand => 0,
             // fake actions
             Actions::RapidSynthesisFail => 9,
             Actions::HastyTouchFail => 9,
             Actions::DaringTouchFail => 96,
-            Actions::FocusedSynthesisFail => 67,
-            Actions::FocusedTouchFail => 68,
         }
     }
 }
@@ -193,12 +193,12 @@ impl From<&Actions> for &str {
             Actions::QuickInnovation => "quick_innovation",
             Actions::ImmaculateMend => "immaculate_mend",
             Actions::TrainedPerfection => "trained_perfection",
+            // 7.4
+            Actions::StellarSteadyHand => "stellar_steady_hand",
             // fake actions
             Actions::RapidSynthesisFail => "rapid_synthsis_fail",
             Actions::HastyTouchFail => "hasty_touch_fail",
             Actions::DaringTouchFail => "daring_touch_fail",
-            Actions::FocusedSynthesisFail => "focused_synthesis_fail",
-            Actions::FocusedTouchFail => "focused_touch_fail",
         }
     }
 }
@@ -240,17 +240,17 @@ impl TryFrom<&str> for Actions {
             "careful_observation" | "设计变动" => Actions::CarefulObservation,
             "heart_and_soul" | "专心致志" => Actions::HeartAndSoul,
             // 7.0
-            "refined_touch" => Actions::RefinedTouch,
-            "daring_touch" => Actions::DaringTouch,
-            "quick_innovation" => Actions::QuickInnovation,
-            "immaculate_mend" => Actions::ImmaculateMend,
-            "trained_perfection" => Actions::TrainedPerfection,
+            "refined_touch" | "精炼加工" => Actions::RefinedTouch,
+            "daring_touch" | "冒进" => Actions::DaringTouch,
+            "quick_innovation" | "快速改革" => Actions::QuickInnovation,
+            "immaculate_mend" | "巧夺天工" => Actions::ImmaculateMend,
+            "trained_perfection" | "工匠的绝技" => Actions::TrainedPerfection,
+            // 7.4
+            "stellar_steady_hand" | "宇宙稳手" => Actions::StellarSteadyHand,
             // fake actions
             "rapid_synthesis_fail" => Actions::RapidSynthesisFail,
             "hasty_touch_fail" => Actions::HastyTouchFail,
             "daring_touch_fail" => Actions::DaringTouchFail,
-            "focused_synthesis_fail" => Actions::FocusedSynthesisFail,
-            "focused_touch_fail" => Actions::FocusedTouchFail,
             _ => return Err(UnknownSkillErr),
         })
     }
@@ -479,33 +479,11 @@ pub struct Buffs {
     /// 匠の好機
     pub expedience: u8,
     /// 专心致志
-    pub heart_and_soul: LimitedActionState,
+    pub heart_and_soul: u8,
     /// 工匠的绝技
-    pub trained_perfection: LimitedActionState,
-    /// 设计变动使用次数
-    /// 假想buff，用于记录设计变动使用的次数
-    pub careful_observation_used: u8,
-    /// 禁止使用Quick改革
-    pub quick_innovation_used: u8,
-    /// 加工连击状态：0无，1中级加工预备，2上级加工预备
-    pub touch_combo_stage: u8,
-    /// 观察（注视预备）
-    /// 假想buff，用于处理 观察-注释制作 OR 观察-注视加工 的连击。
-    pub observed: u8,
-}
-
-#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug)]
-pub enum LimitedActionState {
-    Unused,
-    Active,
-    Used,
-}
-
-impl Default for LimitedActionState {
-    fn default() -> Self {
-        LimitedActionState::Unused
-    }
+    pub trained_perfection: u8,
+    /// 宇宙稳手
+    pub stellar_steady_hand: u8,
 }
 
 fn round_down(v: f64, scale: f64) -> f64 {
@@ -558,13 +536,31 @@ impl Buffs {
         self.wast_not = self.wast_not.saturating_sub(1);
         self.wast_not_ii = self.wast_not_ii.saturating_sub(1);
         self.expedience = self.expedience.saturating_sub(1);
-        self.next_combo();
+        self.stellar_steady_hand = self.stellar_steady_hand.saturating_sub(1);
     }
+}
 
-    pub(crate) fn next_combo(&mut self) {
-        self.touch_combo_stage = self.touch_combo_stage.saturating_sub(2);
-        self.observed = self.observed.saturating_sub(1);
-    }
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug)]
+pub enum ComboStates {
+    Observed = 1,
+    BasicTouched,
+    StandardTouched,
+}
+
+#[cfg_attr(feature = "serde-support", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, Default)]
+pub struct ActionLimits {
+    /// 设计变动使用次数
+    pub careful_observation_used: u8,
+    /// 快速改革使用次数
+    pub quick_innovation_used: u8,
+    /// 专心致志使用次数
+    pub heart_and_soul_used: u8,
+    /// 工匠的绝技使用次数
+    pub trained_perfection_used: u8,
+    /// 宇宙稳手使用次数
+    pub stellar_steady_hand_used: u8,
 }
 
 /// Status 储存一次制作模拟所需的全部状态信息
@@ -573,6 +569,10 @@ impl Buffs {
 pub struct Status {
     /// 玩家当前身上的buff
     pub buffs: Buffs,
+    /// 连击状态
+    pub combo: Option<ComboStates>,
+    /// 技能使用次数限制
+    pub limits: ActionLimits,
     /// 玩家的装备属性
     pub attributes: Attributes,
     /// 本次制作配方
@@ -655,8 +655,6 @@ pub enum CastActionError {
     CarefulObservationUsed3,
     /// 专心致志一次制作只能使用一次
     HeartAndSoulUsed,
-    /// 注视在观察之后无法失败
-    FocusNeverFailsAfterObserved,
     /// 必须在仓促成功后使用
     RequireHastyTouchSuccessed,
     /// 快速改革一次制作只能使用一次
@@ -665,6 +663,8 @@ pub enum CastActionError {
     NotAllowedInInnovationBuff,
     /// 工匠的绝技一次制作只能使用一次
     TrainedPerfectionUsed,
+    /// 宇宙稳手一次制作只能使用一次
+    StellarSteadyHandUsed,
 }
 
 impl Display for CastActionError {
@@ -682,11 +682,11 @@ impl Display for CastActionError {
             CastActionError::RequireInnerQuiet10 => "require 10 stack of inner quiet",
             CastActionError::CarefulObservationUsed3 => "careful observation can only use 3 times",
             CastActionError::HeartAndSoulUsed => "heart and soul can be only used once",
-            CastActionError::FocusNeverFailsAfterObserved => "focus never fails after observed",
             CastActionError::RequireHastyTouchSuccessed => "require hasty touch successed first",
             CastActionError::QuickInnovationUsed => "quick innovation can be only used once",
             CastActionError::NotAllowedInInnovationBuff => "not allowed in innovation buff",
             CastActionError::TrainedPerfectionUsed => "trained perfection can be only used once",
+            CastActionError::StellarSteadyHandUsed => "stellar steady hand can be only used once",
         })
     }
 }
@@ -697,6 +697,8 @@ impl Status {
     pub fn new(attributes: Attributes, recipe: Recipe) -> Self {
         Status {
             buffs: Buffs::default(),
+            combo: None,
+            limits: ActionLimits::default(),
             caches: Caches::new(&attributes, &recipe),
             attributes,
             recipe,
@@ -717,7 +719,7 @@ impl Status {
         if self.buffs.wast_not > 0 || self.buffs.wast_not_ii > 0 {
             reduce -= reduce / 2;
         }
-        if let LimitedActionState::Active = self.buffs.trained_perfection {
+        if self.buffs.trained_perfection > 0 {
             reduce = 0;
         }
         reduce
@@ -727,8 +729,8 @@ impl Status {
         if durability == 0 {
             return;
         }
-        if let LimitedActionState::Active = self.buffs.trained_perfection {
-            self.buffs.trained_perfection = LimitedActionState::Used;
+        if self.buffs.trained_perfection > 0 {
+            self.buffs.trained_perfection = 0;
             return;
         }
         self.durability = self
@@ -795,7 +797,7 @@ impl Status {
             Actions::WasteNot => 56,
             Actions::Veneration => 18,
             Actions::StandardTouch => {
-                if self.buffs.touch_combo_stage == 1 {
+                if let Some(ComboStates::BasicTouched) = self.combo {
                     18
                 } else {
                     32
@@ -812,7 +814,7 @@ impl Status {
             Actions::Manipulation => 96,
             Actions::PrudentTouch => 25,
             Actions::AdvancedTouch => {
-                if self.buffs.touch_combo_stage == 2 || self.buffs.observed > 0 {
+                if let Some(ComboStates::StandardTouched | ComboStates::Observed) = self.combo {
                     18
                 } else {
                     46
@@ -834,12 +836,12 @@ impl Status {
             Actions::ImmaculateMend => 112,
             Actions::QuickInnovation => 0,
             Actions::TrainedPerfection => 0,
+            // 7.4
+            Actions::StellarSteadyHand => 0,
             // fake actions
             Actions::RapidSynthesisFail => 0,
             Actions::HastyTouchFail => 0,
             Actions::DaringTouchFail => 0,
-            Actions::FocusedSynthesisFail => 5,
-            Actions::FocusedTouchFail => 18,
         };
         if let Condition::Pliant = self.condition {
             cp - cp / 2
@@ -851,6 +853,7 @@ impl Status {
     /// 发动一次技能。
     pub fn cast_action(&mut self, action: Actions) {
         self.craft_points -= self.craft_point(action);
+        let mut next_combo_state = None;
         match action {
             Actions::BasicSynthesis => {
                 self.cast_synthesis(10, if self.attributes.level < 31 { 1.0 } else { 1.2 })
@@ -872,7 +875,7 @@ impl Status {
             Actions::IntensiveSynthesis => {
                 self.cast_synthesis(10, 4.0);
                 if !matches!(self.condition, Condition::Good | Condition::Excellent) {
-                    self.buffs.heart_and_soul = LimitedActionState::Used;
+                    self.buffs.heart_and_soul = 0;
                 }
             }
             Actions::PrudentSynthesis => self.cast_synthesis(5, 1.8),
@@ -884,15 +887,15 @@ impl Status {
 
             Actions::BasicTouch => {
                 self.cast_touch(10, 1.0, 1);
-                self.buffs.touch_combo_stage = 1 + 2;
+                next_combo_state = Some(ComboStates::BasicTouched);
             }
             Actions::HastyTouch => {
                 self.cast_touch(10, 1.0, 1);
                 self.buffs.expedience = 2;
             }
             Actions::StandardTouch => {
-                if self.buffs.touch_combo_stage == 1 {
-                    self.buffs.touch_combo_stage = 2 + 2;
+                if let Some(ComboStates::BasicTouched) = self.combo {
+                    next_combo_state = Some(ComboStates::StandardTouched);
                 };
                 self.cast_touch(10, 1.25, 1)
             }
@@ -904,9 +907,9 @@ impl Status {
             Actions::PreciseTouch => {
                 self.cast_touch(10, 1.5, 2);
                 if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                    && matches!(self.buffs.heart_and_soul, LimitedActionState::Active)
+                    && self.buffs.heart_and_soul > 0
                 {
-                    self.buffs.heart_and_soul = LimitedActionState::Used;
+                    self.buffs.heart_and_soul = 0;
                 }
             }
             Actions::PrudentTouch => self.cast_touch(5, 1.0, 1),
@@ -915,9 +918,9 @@ impl Status {
             Actions::TricksOfTheTrade => {
                 self.craft_points = (self.craft_points + 20).min(self.attributes.craft_points);
                 if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                    && matches!(self.buffs.heart_and_soul, LimitedActionState::Active)
+                    && self.buffs.heart_and_soul > 0
                 {
-                    self.buffs.heart_and_soul = LimitedActionState::Used;
+                    self.buffs.heart_and_soul = 0;
                 }
             }
 
@@ -934,9 +937,6 @@ impl Status {
             }
             Actions::Manipulation => {
                 self.buffs.manipulation = self.buffs.manipulation.max(self.new_duration_buff(8));
-                self.buffs.next();
-                self.step += 1;
-                return;
             }
             Actions::MuscleMemory => {
                 self.cast_synthesis(10, 3.0);
@@ -959,24 +959,25 @@ impl Status {
                 self.buffs.innovation = self.buffs.innovation.max(self.new_duration_buff(4));
             }
             Actions::Observe => {
-                self.buffs.observed = 2;
+                next_combo_state = Some(ComboStates::Observed);
             }
             Actions::FinalAppraisal => {
                 self.buffs.final_appraisal = self
                     .buffs
                     .final_appraisal
                     .max(self.new_duration_buff(5) - 1);
-                self.buffs.next_combo();
+                self.combo = None;
                 return;
             }
             Actions::CarefulObservation => {
-                self.buffs.careful_observation_used += 1;
-                self.buffs.next_combo();
+                self.limits.careful_observation_used += 1;
+                self.combo = None;
                 return;
             }
             Actions::HeartAndSoul => {
-                self.buffs.heart_and_soul = LimitedActionState::Active;
-                self.buffs.next_combo();
+                self.buffs.heart_and_soul = 1;
+                self.limits.heart_and_soul_used += 1;
+                self.combo = None;
                 return;
             }
             // 7.0
@@ -984,7 +985,7 @@ impl Status {
                 self.cast_touch(
                     10,
                     1.0,
-                    if self.buffs.touch_combo_stage == 1 {
+                    if let Some(ComboStates::BasicTouched) = self.combo {
                         2
                     } else {
                         1
@@ -994,33 +995,43 @@ impl Status {
             Actions::DaringTouch => self.cast_touch(10, 1.5, 1),
             Actions::QuickInnovation => {
                 self.buffs.innovation = self.buffs.innovation.max(self.new_duration_buff(1) - 1);
-                self.buffs.quick_innovation_used += 1;
-                self.buffs.next_combo();
+                self.limits.quick_innovation_used += 1;
+                self.combo = None;
                 return;
             }
             Actions::ImmaculateMend => {
                 self.durability = self.recipe.durability;
             }
             Actions::TrainedPerfection => {
-                self.buffs.trained_perfection = LimitedActionState::Active;
+                self.buffs.trained_perfection = 1;
+                self.limits.trained_perfection_used += 1;
+            }
+            // 7.4
+            Actions::StellarSteadyHand => {
+                self.buffs.stellar_steady_hand = self.new_duration_buff(3);
+                self.limits.stellar_steady_hand_used += 1;
             }
             // fake actions
             Actions::RapidSynthesisFail => self.consume_durability(10),
             Actions::HastyTouchFail => self.consume_durability(10),
             Actions::DaringTouchFail => self.consume_durability(10),
-            Actions::FocusedSynthesisFail => self.consume_durability(10),
-            Actions::FocusedTouchFail => self.consume_durability(10),
         }
-        if self.buffs.manipulation > 0 && self.durability > 0 {
-            self.durability += 5;
-            self.durability = self.durability.min(self.recipe.durability);
+        if self.buffs.manipulation > 0
+            && self.durability > 0
+            && !matches!(action, Actions::Manipulation)
+        {
+            self.durability = self.recipe.durability.min(self.durability + 5);
         }
         self.buffs.next();
+        self.combo = next_combo_state;
         self.step += 1;
     }
 
     /// 计算当前状态下某技能的成功概率，返回结果介于[0..=100]之间。
     pub fn success_rate(&self, action: Actions) -> u8 {
+        if self.buffs.stellar_steady_hand > 0 {
+            return 100;
+        }
         let addon = match self.condition {
             Condition::Centered => 25,
             _ => 0,
@@ -1037,11 +1048,11 @@ impl Status {
     pub fn is_action_allowed(&self, action: Actions) -> Result<(), CastActionError> {
         use CastActionError::{
             CarefulObservationUsed3, CraftPointNotEnough, CraftingAlreadyFinished,
-            DurabilityNotEnough, FocusNeverFailsAfterObserved, HeartAndSoulUsed,
-            LevelGapMustGreaterThanTen, NotAllowedInInnovationBuff, NotAllowedInWastNotBuff,
-            OnlyAllowedInFirstStep, PlayerLevelTooLow, QuickInnovationUsed, RequireGoodOrExcellent,
+            DurabilityNotEnough, HeartAndSoulUsed, LevelGapMustGreaterThanTen,
+            NotAllowedInInnovationBuff, NotAllowedInWastNotBuff, OnlyAllowedInFirstStep,
+            PlayerLevelTooLow, QuickInnovationUsed, RequireGoodOrExcellent,
             RequireHastyTouchSuccessed, RequireInnerQuiet1, RequireInnerQuiet10,
-            TrainedPerfectionUsed,
+            StellarSteadyHandUsed, TrainedPerfectionUsed,
         };
 
         match action {
@@ -1049,7 +1060,7 @@ impl Status {
 
             Actions::TricksOfTheTrade | Actions::IntensiveSynthesis | Actions::PreciseTouch
                 if !matches!(self.condition, Condition::Good | Condition::Excellent)
-                    && !matches!(self.buffs.heart_and_soul, LimitedActionState::Active) =>
+                    && self.buffs.heart_and_soul == 0 =>
             {
                 Err(RequireGoodOrExcellent)
             }
@@ -1071,32 +1082,23 @@ impl Status {
             Actions::ByregotsBlessing if self.buffs.inner_quiet < 1 => Err(RequireInnerQuiet1),
             Actions::TrainedFinesse if self.buffs.inner_quiet != 10 => Err(RequireInnerQuiet10),
 
-            Actions::CarefulObservation if self.buffs.careful_observation_used >= 3 => {
+            Actions::CarefulObservation if self.limits.careful_observation_used >= 3 => {
                 Err(CarefulObservationUsed3)
             }
-            Actions::HeartAndSoul
-                if !matches!(self.buffs.heart_and_soul, LimitedActionState::Unused) =>
-            {
-                Err(HeartAndSoulUsed)
-            }
-
-            Actions::FocusedSynthesisFail | Actions::FocusedTouchFail
-                if self.buffs.observed > 0 =>
-            {
-                Err(FocusNeverFailsAfterObserved)
-            }
+            Actions::HeartAndSoul if self.limits.heart_and_soul_used > 0 => Err(HeartAndSoulUsed),
 
             Actions::DaringTouch if self.buffs.expedience < 1 => Err(RequireHastyTouchSuccessed),
-            Actions::QuickInnovation if self.buffs.quick_innovation_used >= 1 => {
+            Actions::QuickInnovation if self.limits.quick_innovation_used > 0 => {
                 Err(QuickInnovationUsed)
             }
             Actions::QuickInnovation if self.buffs.innovation > 0 => {
                 Err(NotAllowedInInnovationBuff)
             }
-            Actions::TrainedPerfection
-                if !matches!(self.buffs.trained_perfection, LimitedActionState::Unused) =>
-            {
+            Actions::TrainedPerfection if self.limits.trained_perfection_used > 0 => {
                 Err(TrainedPerfectionUsed)
+            }
+            Actions::StellarSteadyHand if self.limits.stellar_steady_hand_used > 0 => {
+                Err(StellarSteadyHandUsed)
             }
 
             _ if self.durability <= 0 => Err(DurabilityNotEnough),
