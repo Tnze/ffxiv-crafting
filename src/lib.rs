@@ -559,8 +559,8 @@ pub struct ActionLimits {
     pub heart_and_soul_used: u8,
     /// 工匠的绝技使用次数
     pub trained_perfection_used: u8,
-    /// 宇宙稳手使用次数
-    pub stellar_steady_hand_used: u8,
+    /// 宇宙稳手剩余次数
+    pub stellar_steady_hand_charged: u8,
 }
 
 /// Status 储存一次制作模拟所需的全部状态信息
@@ -1009,7 +1009,7 @@ impl Status {
             // 7.4
             Actions::StellarSteadyHand => {
                 self.buffs.stellar_steady_hand = self.new_duration_buff(3);
-                self.limits.stellar_steady_hand_used += 1;
+                self.limits.stellar_steady_hand_charged -= 1;
             }
             // fake actions
             Actions::RapidSynthesisFail => self.consume_durability(10),
@@ -1097,7 +1097,7 @@ impl Status {
             Actions::TrainedPerfection if self.limits.trained_perfection_used > 0 => {
                 Err(TrainedPerfectionUsed)
             }
-            Actions::StellarSteadyHand if self.limits.stellar_steady_hand_used > 0 => {
+            Actions::StellarSteadyHand if self.limits.stellar_steady_hand_charged == 0 => {
                 Err(StellarSteadyHandUsed)
             }
 
